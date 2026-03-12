@@ -26,7 +26,7 @@ const buttonVariants = cva(
   }
 );
 
-export type ButtonProps = JSX.HTMLAttributes<HTMLButtonElement> &
+export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> &
   VariantProps<typeof buttonVariants> & {
     type?: 'button' | 'submit' | 'reset';
   };

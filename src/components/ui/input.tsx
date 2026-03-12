@@ -1,7 +1,7 @@
 import type { JSX } from 'preact';
 import { cn } from '../../utils/cn';
 
-export type InputProps = JSX.HTMLAttributes<HTMLInputElement> & {
+export type InputProps = JSX.InputHTMLAttributes<HTMLInputElement> & {
   type?: string;
 };
 

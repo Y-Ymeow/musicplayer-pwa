@@ -28,7 +28,7 @@ function pictureToDataUrl(picture: {
 export function extractMetadata(file: File): Promise<ParsedMetadata> {
   return new Promise((resolve, reject) => {
     jsmediatags.read(file, {
-      onSuccess: (result) => {
+      onSuccess: (result: { tags: Record<string, unknown> }) => {
         const tags = result.tags as Record<string, any>;
         const picture = tags.picture as
           | { data: number[] | Uint8Array; format: string }
@@ -74,7 +74,7 @@ export function extractMetadata(file: File): Promise<ParsedMetadata> {
           lyric,
         });
       },
-      onError: (error) => reject(error),
+      onError: (error: unknown) => reject(error),
     });
   });
 }
