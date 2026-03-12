@@ -19,13 +19,21 @@ export async function importMusicFreePlugins(payload: string) {
     throw new Error('Invalid plugin list');
   }
 
-  const items: Omit<PluginRecord, 'id'>[] = data.plugins.map((plugin) => ({
-    source: 'musicfree',
-    name: plugin.name,
-    url: plugin.url,
-    version: plugin.version,
-    enabled: true,
-  }));
+  const items: Omit<PluginRecord, 'id'>[] = data.plugins.map((plugin) => {
+    const url = String(plugin.url ?? '').trim();
+    try {
+      new URL(url);
+    } catch {
+      throw new Error(`Invalid plugin url: ${url || 'empty'}`);
+    }
+    return {
+      source: 'musicfree',
+      name: plugin.name,
+      url,
+      version: plugin.version,
+      enabled: true,
+    };
+  });
 
   await replacePlugins('musicfree', items);
   return items.length;

@@ -6,4 +6,6 @@ export { importMusicFreePlugins } from './musicfree';
 export { listPlugins, togglePlugin } from './plugins';
 export { hasExternalAdapter } from './request';
 export { searchWithPlugin, getMediaSourceWithPlugin, getLyricWithPlugin } from './musicfree-runtime';
+export { clearLogs, getLogs, subscribeLogs } from './logs';
+export type { LogEntry } from './logs';
 export { listPlaylists, createPlaylist } from './playlists';

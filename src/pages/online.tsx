@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Button, Input } from '../components/ui';
-import { hasExternalAdapter, importMusicFreePlugins, listPlugins, togglePlugin } from '../services';
+import { clearLogs, hasExternalAdapter, importMusicFreePlugins, listPlugins, subscribeLogs, togglePlugin } from '../services';
+import type { LogEntry } from '../services';
 import type { PluginRecord } from '../services/plugins';
 
 export function OnlinePage() {
@@ -9,12 +10,15 @@ export function OnlinePage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [corsTip, setCorsTip] = useState('');
+  const [logs, setLogs] = useState<LogEntry[]>([]);
+  const [showLogs, setShowLogs] = useState(false);
 
   useEffect(() => {
     listPlugins('musicfree').then(setPlugins);
     if (!hasExternalAdapter()) {
       setCorsTip('未检测到油猴/插件/容器适配，跨域接口可能失败。');
     }
+    return subscribeLogs(setLogs);
   }, []);
 
   const handleImport = async () => {
@@ -74,6 +78,33 @@ export function OnlinePage() {
         ))}
         {plugins.length === 0 && (
           <p class="text-sm text-neutral-400">暂无可用在线源。</p>
+        )}
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-neutral-950/40 p-4 text-sm">
+        <div class="flex items-center justify-between">
+          <p class="text-white">插件日志</p>
+          <div class="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => clearLogs()}>清空</Button>
+            <Button size="sm" variant="secondary" onClick={() => setShowLogs((prev) => !prev)}>
+              {showLogs ? '收起' : '展开'}
+            </Button>
+          </div>
+        </div>
+        {showLogs && (
+          <div class="mt-3 max-h-52 overflow-y-auto rounded-2xl bg-black/40 px-3 py-2 text-xs text-neutral-300">
+            {logs.length === 0 ? (
+              <p class="text-neutral-500">暂无日志。</p>
+            ) : (
+              logs
+                .slice()
+                .reverse()
+                .map((entry) => (
+                  <p key={entry.id} class="whitespace-pre-wrap">
+                    [{new Date(entry.ts).toLocaleTimeString()}] {entry.scope ? `${entry.scope} ` : ''}{entry.level.toUpperCase()} {entry.message}
+                  </p>
+                ))
+            )}
+          </div>
         )}
       </div>
     </div>
