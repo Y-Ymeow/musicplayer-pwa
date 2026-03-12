@@ -94,3 +94,35 @@ export async function clearLocalTracks() {
   await ensureDbReady();
   await TrackModel.deleteMany({ sourceType: "local" });
 }
+
+export async function upsertOnlineTrack(data: {
+  title: string;
+  artist?: string;
+  album?: string;
+  duration?: number;
+  cover?: string;
+  sourceId?: string;
+  sourceUrl?: string;
+  lyric?: string;
+}) {
+  await ensureDbReady();
+  const sourceId = data.sourceId ? String(data.sourceId) : "";
+  let existing = null as Awaited<ReturnType<typeof TrackModel.findOne>> | null;
+  if (sourceId) {
+    existing = await TrackModel.findOne({ where: { sourceType: "online", sourceId } });
+  }
+
+  if (existing?.id) {
+    return TrackModel.update(existing.id, {
+      ...data,
+      sourceType: "online",
+      sourceId,
+    });
+  }
+
+  return TrackModel.create({
+    ...data,
+    sourceType: "online",
+    sourceId,
+  });
+}

@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Button } from '../components/ui';
-import { clearLocalTracks, importLocalDirectory, importLocalFiles, listLocalTracks } from '../services';
-import type { TrackRecord } from '../services/db';
+import { addTrackToPlaylist, clearLocalTracks, importLocalDirectory, importLocalFiles, listLocalTracks, listPlaylists } from '../services';
+import type { PlaylistRecord, TrackRecord } from '../services/db';
 import { playTrack, setQueue } from '../services/player';
 import { usePagination } from '../utils';
 
 export function LocalPage() {
   const [tracks, setTracks] = useState<TrackRecord[]>([]);
   const [loading, setLoading] = useState(false);
+  const [playlists, setPlaylists] = useState<PlaylistRecord[]>([]);
+  const [playlistId, setPlaylistId] = useState<number | ''>('');
 
   const refresh = async () => {
     const data = await listLocalTracks();
     setTracks(data);
+    const list = await listPlaylists();
+    setPlaylists(list);
   };
 
   useEffect(() => {
@@ -46,6 +50,21 @@ export function LocalPage() {
         <Button variant="outline" onClick={handleClear} disabled={loading}>
           清空列表
         </Button>
+        <select
+          class="h-11 rounded-2xl border border-white/10 bg-neutral-950/40 px-3 text-sm text-neutral-100"
+          value={playlistId}
+          onChange={(event) => {
+            const value = (event.target as HTMLSelectElement).value;
+            setPlaylistId(value ? Number(value) : '');
+          }}
+        >
+          <option value="">选择播放列表</option>
+          {playlists.map((playlist) => (
+            <option key={playlist.id} value={playlist.id}>
+              {playlist.name}
+            </option>
+          ))}
+        </select>
       </div>
       <div class="flex-1 overflow-y-auto">
         {tracks.length === 0 ? (
@@ -66,6 +85,18 @@ export function LocalPage() {
                 <div class="flex items-center gap-2">
                   <Button size="sm" variant="ghost" onClick={() => playTrack(track, tracks)}>
                     播放
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!playlistId}
+                    onClick={async () => {
+                      if (!playlistId || !track.id) return;
+                      await addTrackToPlaylist(playlistId, track.id);
+                      await refresh();
+                    }}
+                  >
+                    加入列表
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => setQueue(tracks, 0)}>
                     设为列表

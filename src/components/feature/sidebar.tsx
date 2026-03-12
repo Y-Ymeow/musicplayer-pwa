@@ -1,10 +1,11 @@
 import { Button } from '../ui';
 import { navigate, useHashRoute } from '../../utils';
 
-export function SidebarContent() {
+export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const route = useHashRoute('/library');
   const items = [
     { label: '歌曲信息', path: '/library' },
+    { label: '歌词', path: '/lyrics' },
     { label: '本地音乐', path: '/local' },
     { label: '在线音乐', path: '/online' },
     { label: '搜索', path: '/search' },
@@ -22,7 +23,10 @@ export function SidebarContent() {
         {items.map((item) => (
           <button
             key={item.path}
-            onClick={() => navigate(item.path)}
+            onClick={() => {
+              navigate(item.path);
+              onNavigate?.();
+            }}
             class={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-neutral-200 transition hover:border-emerald-400/30 hover:text-white ${
               route === item.path ? 'border-emerald-400/50 bg-emerald-400/10' : 'border-white/5 bg-white/5'
             }`}
