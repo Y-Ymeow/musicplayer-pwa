@@ -20,6 +20,7 @@ import { Store, createStore, getGlobalStore, createSlice } from './state';
 import { EventBus, WorkerManager, createEventBus, createWorker, createWorkerPool } from './utils';
 import { Compression, createCompression, compressText, decompressText, compressObject, decompressObject } from './storages';
 import { FetchAdapter } from './requests/adapters/fetch';
+import { FS, createFS, getFS, setFS, isFSAvailable, waitForFS } from './fs';
 
 import type { CoreConfig } from './ai/core';
 import type { OpenAIConfig } from './ai/providers/openai';
@@ -467,4 +468,43 @@ export {
   decompressText,
   compressObject,
   decompressObject,
+};
+
+// ==================== FS ====================
+
+/**
+ * 创建文件系统实例
+ * @param config 文件系统配置
+ */
+export function initFS(config?: { baseDir?: string }): FS {
+  return createFS(config);
+}
+
+/**
+ * 获取全局 FS 实例
+ * @param config 文件系统配置
+ */
+export function getGlobalFS(config?: { baseDir?: string }): FS {
+  return getFS(config);
+}
+
+/**
+ * 检查 FS 是否可用
+ */
+export { isFSAvailable };
+
+/**
+ * 等待 FS 就绪
+ * @param timeout 超时时间（毫秒）
+ */
+export { waitForFS };
+
+// 重新导出 FS
+export {
+  FS,
+  createFS,
+  getFS,
+  setFS,
+  isFSAvailable as checkFSAvailable,
+  waitForFS as waitForFSReady,
 };

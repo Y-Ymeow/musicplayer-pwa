@@ -57,6 +57,7 @@ export {
   ExternalAdapter,
   createGMAdapter,
   createChromeAdapter,
+  createAIFrameworkAdapter,
   createAutoExternalAdapter,
   type GMXmlHttpRequest,
   type ChromeExtensionInterface,

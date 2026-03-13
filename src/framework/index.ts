@@ -174,7 +174,34 @@ export type {
   CompressionResult,
 } from "./storages";
 
+export type {
+  // FS 类型
+  IFS,
+  FSConfig,
+  FileInfo,
+  DirEntry,
+  ReadFileOptions,
+  WriteFileOptions,
+  CopyMoveOptions,
+  FileWatchEvent,
+  FileWatcherCallback,
+} from "./fs";
+
 // ==================== 模块重导出 ====================
 export { Store } from "./state";
 export { EventBus, WorkerManager } from "./utils";
 export { Compression } from "./storages";
+
+// FS 模块快捷函数
+export {
+  initFS,
+  getGlobalFS,
+  isFSAvailable,
+  waitForFS,
+  checkFSAvailable,
+  waitForFSReady,
+  FS,
+  createFS,
+  getFS,
+  setFS,
+} from "./helper";

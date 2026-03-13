@@ -142,9 +142,27 @@ export class ExternalAdapter implements IRequestAdapter {
 
     try {
       const response = await iface.request(config);
+      let data = response.data;
+
+      // 处理 base64 编码的 arraybuffer（Chrome 扩展传递）
+      if (
+        data &&
+        typeof data === 'object' &&
+        (data as any).__type === 'base64' &&
+        typeof (data as any).data === 'string'
+      ) {
+        const base64 = (data as any).data;
+        const binary = atob(base64);
+        const arrayBuffer = new ArrayBuffer(binary.length);
+        const uint8Array = new Uint8Array(arrayBuffer);
+        for (let i = 0; i < binary.length; i++) {
+          uint8Array[i] = binary.charCodeAt(i);
+        }
+        data = arrayBuffer;
+      }
 
       return {
-        data: response.data as T,
+        data: data as T,
         status: response.status,
         statusText: response.statusText,
         headers: response.headers,
@@ -196,13 +214,26 @@ export class ExternalAdapter implements IRequestAdapter {
  */
 function getGMXmlHttpRequest(): GMXmlHttpRequest | undefined {
   if (typeof window === 'undefined') return undefined;
-  
+
   const win = window as {
     unsafeWindow?: { GM_xmlhttpRequest?: GMXmlHttpRequest };
     GM_xmlhttpRequest?: GMXmlHttpRequest;
   };
-  
+
   return win.unsafeWindow?.GM_xmlhttpRequest || win.GM_xmlhttpRequest;
+}
+
+/**
+ * 获取 AI Framework 请求桥接对象
+ */
+function getAIFrameworkBridge(): ExternalRequestInterface | undefined {
+  if (typeof window === 'undefined') return undefined;
+
+  const bridge = (window as any).__AI_FRAMEWORK_REQUEST_BRIDGE__;
+  if (bridge && typeof bridge.request === 'function') {
+    return bridge as ExternalRequestInterface;
+  }
+  return undefined;
 }
 
 /**
@@ -241,7 +272,15 @@ export function createGMAdapter(): ExternalAdapter | null {
                   }
                 }
 
-                let data: unknown = response.responseText;
+                // 根据 responseType 获取正确的响应数据
+                let data: unknown;
+                if (config.responseType === 'arraybuffer') {
+                  // arraybuffer 响应使用 response 属性
+                  data = (response as any).response;
+                } else {
+                  data = response.responseText;
+                }
+
                 if (config.responseType === 'json' && typeof data === 'string') {
                   try {
                     data = JSON.parse(data);
@@ -443,45 +482,42 @@ function buildURL(url: string, params?: Record<string, unknown>): string {
 }
 
 /**
+ * 创建 AI Framework 桥接适配器
+ */
+export function createAIFrameworkAdapter(): ExternalAdapter | null {
+  const bridge = getAIFrameworkBridge();
+  if (!bridge) {
+    return null;
+  }
+
+  return new ExternalAdapter({
+    name: 'ai_framework_bridge',
+    getInterface: () => bridge,
+  });
+}
+
+/**
  * 自动检测并创建最佳外部适配器
  */
 export function createAutoExternalAdapter(): ExternalAdapter | null {
-  // 优先尝试框架桥接接口
-  if (getFrameworkBridge()) {
-    return createFrameworkBridgeAdapter();
+  // 优先尝试 AI Framework 桥接
+  const bridge = getAIFrameworkBridge();
+  if (bridge) {
+    return new ExternalAdapter({
+      name: 'external',
+      getInterface: () => bridge,
+    });
   }
 
-  // 优先尝试油猴
+  // 然后尝试油猴
   if (getGMXmlHttpRequest()) {
     return createGMAdapter();
   }
 
-  // 然后尝试 Chrome 插件
+  // 最后尝试 Chrome 插件
   if (getChromeRuntime()) {
     return createChromeAdapter();
   }
 
   return null;
-}
-
-/**
- * 获取框架桥接接口
- */
-function getFrameworkBridge(): ExternalRequestInterface | undefined {
-  if (typeof window === 'undefined') return undefined;
-  const win = window as { __AI_FRAMEWORK_REQUEST_BRIDGE__?: ExternalRequestInterface };
-  return win.__AI_FRAMEWORK_REQUEST_BRIDGE__;
-}
-
-/**
- * 创建框架桥接适配器
- */
-export function createFrameworkBridgeAdapter(): ExternalAdapter | null {
-  const bridge = getFrameworkBridge();
-  if (!bridge) return null;
-
-  return new ExternalAdapter({
-    name: 'framework_bridge',
-    getInterface: () => bridge,
-  });
 }

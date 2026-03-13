@@ -13,6 +13,7 @@ export interface TrackRecord extends ModelData {
   sourceType: TrackSourceType;
   sourceId?: string;
   sourceUrl?: string;
+  sourcePluginUrl?: string;  // 保存音乐插件 URL，用于重新获取播放地址
   fileHandle?: FileSystemFileHandle;
   fileKey?: string;
   filePath?: string;
@@ -100,6 +101,7 @@ export const TrackModel = new Model<TrackRecord>(db, 'tracks', {
   sourceType: field.string({ required: true }),
   sourceId: field.string(),
   sourceUrl: field.string(),
+  sourcePluginUrl: field.string(),
   fileName: field.string(),
   fileKey: field.string(),
   filePath: field.string(),

@@ -30,6 +30,8 @@ export interface RequestConfig {
   responseType?: 'json' | 'text' | 'blob' | 'arraybuffer';
   /** 取消信号 */
   signal?: AbortSignal;
+
+  data?: any;
 }
 
 /**

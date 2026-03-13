@@ -8,5 +8,11 @@ export { hasExternalAdapter } from './request';
 export { searchWithPlugin, getMediaSourceWithPlugin, getLyricWithPlugin } from './musicfree-runtime';
 export { clearLogs, getLogs, subscribeLogs } from './logs';
 export type { LogEntry } from './logs';
-export { addTrackToPlaylist, listPlaylistTracks } from './playlists';
+export { 
+  addTrackToPlaylist, 
+  listPlaylistTracks,
+  removeTrackFromPlaylist,
+  clearPlaylist,
+  deletePlaylist,
+} from './playlists';
 export { listPlaylists, createPlaylist } from './playlists';
