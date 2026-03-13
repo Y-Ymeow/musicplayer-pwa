@@ -7,6 +7,12 @@ import qs from 'qs';
 import bigInt from 'big-integer';
 import { requestManager, requestText } from './request';
 import { addLog } from './logs';
+import { getGlobalStorageManager } from '../framework';
+import type { StorageType } from '../framework';
+
+const PLUGIN_ADDR_CACHE_KEY = 'plugin:addr:cache';
+const PLUGIN_FILE_PREFIX = 'plugin:file:';
+const DEFAULT_CACHE_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export interface MusicFreeSearchResult<T = unknown> {
   isEnd: boolean;
@@ -24,6 +30,128 @@ export interface MusicFreePlugin {
 }
 
 const pluginCache = new Map<string, MusicFreePlugin>();
+let storageManager: ReturnType<typeof getGlobalStorageManager> | null = null;
+let storageInitialized = false;
+
+async function initStorageIfNeeded() {
+  if (storageInitialized) return;
+  try {
+    const storage = getStorageManager();
+    await storage.initAll();
+    storageInitialized = true;
+  } catch (error) {
+    addLog({
+      level: 'warn',
+      scope: 'plugin:cache',
+      message: `Failed to init storage: ${error}`,
+      data: [error],
+    });
+  }
+}
+
+function getStorageManager() {
+  if (!storageManager) {
+    storageManager = getGlobalStorageManager({ defaultStorage: 'localStorage' });
+  }
+  return storageManager;
+}
+
+interface PluginAddrCache {
+  [url: string]: {
+    code: string;
+    cachedAt: number;
+  };
+}
+
+async function getCachedPluginCode(url: string): Promise<string | null> {
+  await initStorageIfNeeded();
+  try {
+    const storage = getStorageManager();
+    const cache = await storage.getValue<PluginAddrCache>(PLUGIN_ADDR_CACHE_KEY, 'localStorage');
+    if (!cache || !cache[url]) return null;
+    
+    const cached = cache[url];
+    // Check if cache is expired (default 7 days)
+    if (Date.now() - cached.cachedAt > DEFAULT_CACHE_TTL) {
+      return null;
+    }
+    return cached.code;
+  } catch {
+    return null;
+  }
+}
+
+async function setCachedPluginCode(url: string, code: string): Promise<void> {
+  await initStorageIfNeeded();
+  try {
+    const storage = getStorageManager();
+    const existing = await storage.getValue<PluginAddrCache>(PLUGIN_ADDR_CACHE_KEY, 'localStorage') || {};
+    existing[url] = {
+      code,
+      cachedAt: Date.now(),
+    };
+    await storage.set(PLUGIN_ADDR_CACHE_KEY, existing, DEFAULT_CACHE_TTL, undefined, 'localStorage');
+  } catch (error) {
+    addLog({
+      level: 'warn',
+      scope: `plugin:${url}`,
+      message: `Failed to cache plugin code: ${error}`,
+      data: [error],
+    });
+  }
+}
+
+async function getCachedPluginFromOPFS(url: string): Promise<MusicFreePlugin | null> {
+  await initStorageIfNeeded();
+  try {
+    const storage = getStorageManager();
+    const key = `${PLUGIN_FILE_PREFIX}${btoa(url)}`;
+    const entry = await storage.get<{ code: string; cachedAt: number }>(key, 'opfs');
+    if (!entry) return null;
+    
+    if (Date.now() - entry.value.cachedAt > DEFAULT_CACHE_TTL) {
+      await storage.delete(key, 'opfs');
+      return null;
+    }
+    
+    // Execute cached code
+    return executePluginCode(entry.value.code, url);
+  } catch {
+    return null;
+  }
+}
+
+async function setCachedPluginToOPFS(url: string, plugin: MusicFreePlugin, code: string): Promise<void> {
+  await initStorageIfNeeded();
+  try {
+    const storage = getStorageManager();
+    const key = `${PLUGIN_FILE_PREFIX}${btoa(url)}`;
+    await storage.set(key, { code, cachedAt: Date.now() }, DEFAULT_CACHE_TTL, undefined, 'opfs');
+    // Also cache the parsed plugin in memory
+    pluginCache.set(url, plugin);
+  } catch (error) {
+    addLog({
+      level: 'warn',
+      scope: `plugin:${url}`,
+      message: `Failed to cache plugin to OPFS: ${error}`,
+      data: [error],
+    });
+  }
+}
+
+function executePluginCode(code: string, url: string): MusicFreePlugin {
+  const module = { exports: {} as any };
+  const exports = module.exports;
+  const require = createRequire(url);
+  const pluginConsole = createPluginConsole(url);
+  const fn = new Function('require', 'module', 'exports', 'console', `${code}\n; return module.exports;`);
+  const result = fn(require, module, exports, pluginConsole);
+  const plugin = (result?.default ?? result) as MusicFreePlugin;
+  if (!plugin || typeof plugin !== 'object') {
+    throw new Error('Invalid plugin');
+  }
+  return plugin;
+}
 
 function formatArgs(args: unknown[]) {
   return args
@@ -173,31 +301,56 @@ function createRequire(scopeUrl?: string) {
 }
 
 export async function loadMusicFreePlugin(url: string): Promise<MusicFreePlugin> {
+  // Check in-memory cache first
   if (pluginCache.has(url)) return pluginCache.get(url)!;
-  let code = '';
-  try {
-    code = await requestText(url);
-  } catch (error) {
+  
+  // Check OPFS cache (parsed plugin)
+  const cachedFromOPFS = await getCachedPluginFromOPFS(url);
+  if (cachedFromOPFS) {
     addLog({
-      level: 'error',
+      level: 'log',
       scope: `plugin:${url}`,
-      message: error instanceof Error ? error.message : String(error),
-      data: [error],
+      message: 'Loaded plugin from OPFS cache',
+      data: [],
     });
-    throw error;
+    return cachedFromOPFS;
+  }
+  
+  let code = '';
+  
+  // Try to get cached code from localStorage
+  const cachedCode = await getCachedPluginCode(url);
+  if (cachedCode) {
+    code = cachedCode;
+    addLog({
+      level: 'log',
+      scope: `plugin:${url}`,
+      message: 'Loaded plugin code from localStorage cache',
+      data: [],
+    });
+  } else {
+    // Fetch from remote
+    try {
+      code = await requestText(url);
+      // Cache the code to localStorage
+      await setCachedPluginCode(url, code);
+    } catch (error) {
+      addLog({
+        level: 'error',
+        scope: `plugin:${url}`,
+        message: error instanceof Error ? error.message : String(error),
+        data: [error],
+      });
+      throw error;
+    }
   }
 
-  const module = { exports: {} as any };
-  const exports = module.exports;
-  const require = createRequire(url);
-  const pluginConsole = createPluginConsole(url);
-  const fn = new Function('require', 'module', 'exports', 'console', `${code}\n; return module.exports;`);
-  const result = fn(require, module, exports, pluginConsole);
-  const plugin = (result?.default ?? result) as MusicFreePlugin;
-  if (!plugin || typeof plugin !== 'object') {
-    throw new Error('Invalid plugin');
-  }
-  pluginCache.set(url, plugin);
+  // Execute the plugin code
+  const plugin = executePluginCode(code, url);
+  
+  // Cache the parsed plugin to OPFS
+  await setCachedPluginToOPFS(url, plugin, code);
+  
   return plugin;
 }
 
