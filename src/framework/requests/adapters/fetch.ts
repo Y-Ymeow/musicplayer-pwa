@@ -147,8 +147,6 @@ export class FetchAdapter implements IRequestAdapter {
         signal: controller.signal,
       });
 
-      console.log(response.body, await response.text(), await response.json());
-
       clearTimeout(timeoutId);
 
       if (!response.ok) {
