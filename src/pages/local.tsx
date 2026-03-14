@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { Button } from "../components/ui";
 import {
   addTrackToPlaylist,
@@ -17,6 +17,7 @@ export function LocalPage() {
   const [loading, setLoading] = useState(false);
   const [playlists, setPlaylists] = useState<PlaylistRecord[]>([]);
   const [playlistId, setPlaylistId] = useState<number | "">("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = async () => {
     const data = await listLocalTracks();
@@ -30,10 +31,36 @@ export function LocalPage() {
   }, []);
 
   const handleImportFiles = async () => {
+    // 直接触发隐藏的 input 点击
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = async (event: Event) => {
+    const target = event.target as HTMLInputElement;
+    const files = Array.from(target.files ?? []);
+    if (files.length === 0) {
+      return;
+    }
+    
     setLoading(true);
-    await importLocalFiles();
+    
+    // 创建兼容的 handle 对象
+    const handles = files.map((file) => ({
+      kind: "file" as const,
+      name: file.name,
+      async getFile() { return file; },
+      getPath() { return null; },
+      getURL() { return null; },
+    }));
+    
+    const { importFileHandles } = await import("../services/library");
+    await importFileHandles(handles as any);
+    
     await refresh();
     setLoading(false);
+    
+    // 清空 input，允许重复选择同一文件
+    target.value = "";
   };
 
   const handleClear = async () => {
@@ -79,6 +106,17 @@ export function LocalPage() {
             </option>
           ))}
         </select>
+        {/* 隐藏的文件输入 */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          accept="audio/*"
+          class="hidden"
+          onChange={handleFileSelect}
+          // capture="user" 在某些移动设备上可以触发系统文件选择器
+          capture="user"
+        />
       </div>
       <div class="flex-1 overflow-y-auto">
         {tracks.length === 0 ? (

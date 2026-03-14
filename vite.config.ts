@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['adapt.js', 'vite.svg'],
+      includeAssets: ['adapt.js', 'vite.svg', 'icons/*.png'],
       manifest: {
         name: 'MusicPlayer PWA',
         short_name: 'MusicPlayer',
@@ -21,9 +21,26 @@ export default defineConfig({
         start_url: './',
         icons: [
           {
-            src: 'vite.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: './icons/manifest-icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: './icons/manifest-icon-512.png',
+            sizes: '512x512',
+            type: 'image/png',
+          },
+          {
+            src: './icons/manifest-icon-192.maskable.png',
+            sizes: '192x192',
+            type: 'image/png',
+            purpose: 'maskable',
+          },
+          {
+            src: './icons/manifest-icon-512.maskable.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
       },

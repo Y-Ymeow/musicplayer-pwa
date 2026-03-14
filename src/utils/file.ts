@@ -34,15 +34,17 @@ export interface ExtendedFileHandle extends FileSystemFileHandle {
 
 /**
  * 选择音频文件
- * 
- * 浏览器环境：使用 File System Access API
+ *
+ * 浏览器环境：优先使用 input element（兼容性更好）
  * adapt.js 环境：使用 adapt.js 的 polyfill（调用 Tauri 对话框）
  */
 export async function pickAudioFiles(): Promise<ExtendedFileHandle[]> {
-  // 检查是否有 showOpenFilePicker（adapt.js 会 polyfill）
-  if ("showOpenFilePicker" in window) {
+  const win = window as any;
+  
+  // 在 adapt.js 环境，使用 showOpenFilePicker
+  if (win.__TAURI__ && "showOpenFilePicker" in window) {
     try {
-      const handles = await (window as any).showOpenFilePicker({
+      const handles = await win.showOpenFilePicker({
         multiple: true,
         types: [
           {
@@ -62,12 +64,23 @@ export async function pickAudioFiles(): Promise<ExtendedFileHandle[]> {
     }
   }
 
-  // 降级方案：使用 input element（纯浏览器环境）
+  // 浏览器环境：使用 input element（兼容性更好，不需要安全上下文）
   return new Promise((resolve) => {
     const input = document.createElement("input");
     input.type = "file";
     input.multiple = true;
     input.accept = "audio/*";
+    
+    // 将 input 添加到 DOM（某些浏览器要求）
+    input.style.display = "none";
+    document.body.appendChild(input);
+    
+    const cleanup = () => {
+      if (document.body.contains(input)) {
+        document.body.removeChild(input);
+      }
+    };
+    
     input.onchange = () => {
       const files = Array.from(input.files ?? []);
       // 创建兼容的 handle 对象
@@ -78,23 +91,44 @@ export async function pickAudioFiles(): Promise<ExtendedFileHandle[]> {
         getPath() { return null; },
         getURL() { return null; },
       }));
+      cleanup();
       resolve(handles as ExtendedFileHandle[]);
     };
+    
+    // 用户取消时也会触发 onchange（files 为空）
+    // 使用 onclick 检测取消
+    input.onclick = () => {
+      // 点击后设置标记
+      (input as any)._clicked = true;
+    };
+    
+    // 监听 blur 事件检测取消（对话框关闭但未选择文件）
+    input.onblur = () => {
+      if ((input as any)._clicked && !input.files?.length) {
+        // 用户取消了选择
+        cleanup();
+        resolve([]);
+      }
+    };
+    
+    // 直接点击，保持在用户手势上下文中
     input.click();
   });
 }
 
 /**
  * 选择音频目录
- * 
+ *
  * 浏览器环境：使用 showDirectoryPicker
  * adapt.js 环境：暂不支持（返回空数组）
  */
 export async function pickAudioDirectory(): Promise<ExtendedFileHandle[]> {
-  // 浏览器环境
-  if ("showDirectoryPicker" in window) {
+  const win = window as any;
+  
+  // 仅在 adapt.js 环境使用 showDirectoryPicker
+  if (win.__TAURI__ && "showDirectoryPicker" in window) {
     try {
-      const dirHandle = await (window as any).showDirectoryPicker();
+      const dirHandle = await win.showDirectoryPicker();
       const files: ExtendedFileHandle[] = [];
 
       // 遍历目录
@@ -112,6 +146,7 @@ export async function pickAudioDirectory(): Promise<ExtendedFileHandle[]> {
     }
   }
 
+  // 纯浏览器环境暂不支持目录选择
   return [];
 }
 
