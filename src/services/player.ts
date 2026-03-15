@@ -58,7 +58,7 @@ function stopProgressTimer() {
 function startProgressTimer() {
   stopProgressTimer();
   consecutiveZeroDurationCount = 0;
-  
+
   progressTimer = window.setInterval(async () => {
     if (state.isPlaying && window.__TAURI__?.audio) {
       try {
@@ -73,13 +73,13 @@ function startProgressTimer() {
         // 3. position 回退（重新开始）
         if (durationMs > 0) {
           consecutiveZeroDurationCount = 0;
-          
+
           if (positionMs >= durationMs - 100) {
             console.log("[Player] Track nearly ended:", positionMs, durationMs);
             handleEnded();
             return;
           }
-          
+
           // 检测 position 回退（可能是切歌）
           if (lastPositionMs > 0 && positionMs < lastPositionMs - 5000) {
             console.log("[Player] Position jumped back, may be new track");
@@ -87,25 +87,32 @@ function startProgressTimer() {
         } else if (lastPositionMs > 0) {
           // duration 变为 0，可能是播放结束
           consecutiveZeroDurationCount++;
-          console.log("[Player] Duration is 0, count:", consecutiveZeroDurationCount);
-          
+          console.log(
+            "[Player] Duration is 0, count:",
+            consecutiveZeroDurationCount,
+          );
+
           // 连续 3 次检测到 duration 为 0，认为播放结束
-          if (consecutiveZeroDurationCount >= 3) {
+          if (consecutiveZeroDurationCount) {
             console.log("[Player] Track ended (duration=0)");
             handleEnded();
             return;
           }
         }
-        
+
         lastPositionMs = positionMs;
 
         setState({
           currentTime: positionMs / 1000, // 转换为秒
           duration: durationMs > 0 ? durationMs / 1000 : state.duration,
         });
-        
+
         // 每 5 秒保存一次播放进度到数据库
-        if (state.current?.id && positionMs > 0 && Math.floor(positionMs / 1000) % 5 === 0) {
+        if (
+          state.current?.id &&
+          positionMs > 0 &&
+          Math.floor(positionMs / 1000) % 5 === 0
+        ) {
           savePlaybackProgress(state.current.id, positionMs / 1000);
         }
       } catch (e) {
@@ -120,7 +127,7 @@ function startProgressTimer() {
  */
 async function savePlaybackProgress(trackId: number, currentTime: number) {
   try {
-    await TrackModel.update(trackId, { 
+    await TrackModel.update(trackId, {
       // 如果有 duration 字段，可以保存
     } as any);
   } catch (e) {
@@ -129,7 +136,14 @@ async function savePlaybackProgress(trackId: number, currentTime: number) {
 }
 
 function handleEnded() {
-  console.log("[Player] handleEnded called, repeat:", state.repeat, "index:", state.index, "queue.length:", state.queue.length);
+  console.log(
+    "[Player] handleEnded called, repeat:",
+    state.repeat,
+    "index:",
+    state.index,
+    "queue.length:",
+    state.queue.length,
+  );
   stopProgressTimer();
   lastPositionMs = 0;
 
@@ -245,7 +259,7 @@ async function playIndex(index: number) {
   if (!next) return;
 
   console.log("[Player] playIndex:", index, next.fileName);
-  
+
   // 重置状态
   stopProgressTimer();
   lastPositionMs = 0;
@@ -269,7 +283,10 @@ async function playIndex(index: number) {
       // 兼容旧的 invoke 方式
       await window.__TAURI__.invoke("audio_play", { url: playUrl });
     } else {
-      console.warn("[Player] No Tauri bridge, falling back to HTML5 Audio:", playUrl);
+      console.warn(
+        "[Player] No Tauri bridge, falling back to HTML5 Audio:",
+        playUrl,
+      );
       // 兜底：使用 HTML5 Audio
       const audio = new Audio(playUrl);
       audio.play().catch(console.error);
@@ -293,7 +310,7 @@ export function playTrack(track: TrackRecord, queue?: TrackRecord[]) {
   if (queue && queue.length > 0) {
     // 找到当前 track 在队列中的索引
     const trackId = track.id;
-    const startIndex = queue.findIndex(t => t.id === trackId);
+    const startIndex = queue.findIndex((t) => t.id === trackId);
     setQueue(queue, startIndex >= 0 ? startIndex : 0);
     return;
   }
@@ -359,7 +376,7 @@ function stopAudio() {
  */
 export function nextTrack() {
   if (state.queue.length === 0) return;
-  
+
   // 列表循环：最后一首的下一首是第一首
   if (state.repeat === "all") {
     const nextIndex = (state.index + 1) % state.queue.length;
@@ -367,7 +384,7 @@ export function nextTrack() {
     void playIndex(nextIndex);
     return;
   }
-  
+
   // 不循环：只有非最后一首才播放下一首
   if (state.index < state.queue.length - 1) {
     console.log("[Player] nextTrack:", state.index + 1);
@@ -380,15 +397,16 @@ export function nextTrack() {
  */
 export function prevTrack() {
   if (state.queue.length === 0) return;
-  
+
   // 列表循环：第一首的上一首是最后一首
   if (state.repeat === "all") {
-    const prevIndex = state.index <= 0 ? state.queue.length - 1 : state.index - 1;
+    const prevIndex =
+      state.index <= 0 ? state.queue.length - 1 : state.index - 1;
     console.log("[Player] prevTrack with repeat all:", prevIndex);
     void playIndex(prevIndex);
     return;
   }
-  
+
   // 不循环：只有非第一首才播放上一首
   if (state.index > 0) {
     console.log("[Player] prevTrack:", state.index - 1);

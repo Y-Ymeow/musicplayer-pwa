@@ -17,7 +17,10 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div class="flex h-full flex-col gap-6">
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-xs uppercase tracking-[0.35em]" style={{ color: "var(--theme-primary-light)" }}>
+          <p
+            class="text-xs uppercase tracking-[0.35em]"
+            style={{ color: "var(--theme-primary-light)" }}
+          >
             Library
           </p>
           <h2 class="mt-2 text-lg font-semibold text-white">音乐库</h2>
@@ -42,13 +45,6 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </button>
         ))}
       </nav>
-      <div class="mt-auto rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-neutral-400">
-        <p>在线源：MusicFree</p>
-        <p class="mt-2">支持下载与离线播放</p>
-        <Button class="mt-4 w-full" size="sm">
-          配置音乐源
-        </Button>
-      </div>
     </div>
   );
 }
