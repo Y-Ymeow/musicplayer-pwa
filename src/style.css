@@ -155,6 +155,16 @@ input[type="range"]::-moz-range-thumb:hover {
   animation: lyricsFlow 1.4s linear infinite;
 }
 
+/* 歌词逐字渐变进度动画 */
+@keyframes lyric-progress {
+  0% {
+    background-size: 0% 100%;
+  }
+  100% {
+    background-size: 100% 100%;
+  }
+}
+
 /* 主题渐变背景类 */
 .theme-gradient-bg {
   background: linear-gradient(to bottom right, var(--theme-gradient-from), var(--theme-gradient-to));

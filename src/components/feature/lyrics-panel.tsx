@@ -169,7 +169,7 @@ export function LyricsPanel() {
                           );
                         }
 
-                        // 逐字歌词
+                        // 逐字歌词：使用 CSS 动画实现渐变效果
                         return (
                           <span
                             key={`${line.time}-${segIndex}`}
@@ -185,11 +185,13 @@ export function LyricsPanel() {
                                 class="pointer-events-none absolute inset-0 text-transparent"
                                 style={{
                                   background: `linear-gradient(90deg, var(--theme-primary), var(--theme-primary-hover))`,
-                                  backgroundSize: `${progress * 100}% 100%`,
+                                  backgroundSize: "100% 100%",
                                   backgroundRepeat: "no-repeat",
                                   WebkitBackgroundClip: "text",
                                   backgroundClip: "text",
-                                  transition: "background-size 120ms linear",
+                                  // 使用 CSS 动画实现平滑渐变
+                                  animation: `lyric-progress ${duration}s linear forwards`,
+                                  animationPlayState: "running",
                                 }}
                               >
                                 {text}
