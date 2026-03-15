@@ -6,10 +6,12 @@ import {
   groupLinesByTime,
   parseWordLrc,
 } from "../../utils";
+import { getCurrentTheme, THEME_COLORS } from "../../utils/theme";
 
 export function LyricsPanel() {
   const player = usePlayerState();
   const track = player.current;
+  const theme = THEME_COLORS[getCurrentTheme()];
   const lyricText =
     track?.lyric && track.lyric !== "[object Object]" ? track.lyric : "";
   const parsed = useMemo(
@@ -49,9 +51,11 @@ export function LyricsPanel() {
   return (
     <div class="flex h-full flex-col rounded-3xl border border-white/10 bg-white/5 p-6">
       <div class="flex flex-wrap items-start gap-4">
-        <div class="h-20 w-20 overflow-hidden rounded-3xl bg-gradient-to-br from-emerald-400/60 to-cyan-400/60">
-          {track?.cover && (
+        <div class={`h-20 w-20 overflow-hidden rounded-3xl bg-gradient-to-br ${theme.gradientFrom} ${theme.gradientTo}`}>
+          {track?.cover ? (
             <img src={track.cover} alt="" class="h-full w-full object-cover" />
+          ) : (
+            <img src="/logo.png" alt="" class="h-full w-full object-cover" />
           )}
         </div>
         <div class="min-w-[180px] flex-1">

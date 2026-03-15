@@ -1,18 +1,22 @@
 import { Button } from '../ui';
 import { nextTrack, prevTrack, seekTo, togglePlay, toggleRepeat, usePlayerState } from '../../services/player';
+import { getCurrentTheme, THEME_COLORS } from '../../utils/theme';
 
 export function PlayerBar() {
   const player = usePlayerState();
   const progress = player.duration ? player.currentTime / player.duration : 0;
   const repeatLabel = player.repeat === 'off' ? '↻' : player.repeat === 'all' ? '🔁' : '🔂';
+  const theme = THEME_COLORS[getCurrentTheme()];
 
   return (
     <div class="border-t border-white/10 bg-neutral-950/90 backdrop-blur">
       <div class="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-4 sm:px-6">
         <div class="flex items-center gap-4">
-          <div class="h-11 w-11 overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-400/60 to-cyan-400/60">
-            {player.current?.cover && (
+          <div class={`h-11 w-11 overflow-hidden rounded-2xl bg-gradient-to-br ${theme.gradientFrom} ${theme.gradientTo}`}>
+            {player.current?.cover ? (
               <img src={player.current.cover} alt="" class="h-full w-full object-cover" />
+            ) : (
+              <img src="/logo.png" alt="" class="h-full w-full object-cover" />
             )}
           </div>
           <div class="min-w-0 flex-1">
@@ -41,7 +45,7 @@ export function PlayerBar() {
             step="0.1"
             value={player.currentTime}
             onInput={(event) => seekTo(Number((event.target as HTMLInputElement).value))}
-            style={{ background: `linear-gradient(90deg, #34d399 ${progress * 100}%, rgba(255,255,255,0.1) 0%)` }}
+            style={{ background: `linear-gradient(90deg, ${theme.primary} ${progress * 100}%, rgba(255,255,255,0.1) 0%)` }}
           />
           <span>{formatTime(player.duration)}</span>
         </div>

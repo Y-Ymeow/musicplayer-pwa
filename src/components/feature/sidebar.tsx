@@ -1,4 +1,4 @@
-import { Button } from "../ui";
+import { Button, ThemeSwitcher } from "../ui";
 import { navigate, useHashRoute } from "../../utils";
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
@@ -15,11 +15,14 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <div class="flex h-full flex-col gap-6">
-      <div>
-        <p class="text-xs uppercase tracking-[0.35em] text-emerald-300/70">
-          Library
-        </p>
-        <h2 class="mt-2 text-lg font-semibold text-white">音乐库</h2>
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-[0.35em] text-emerald-300/70">
+            Library
+          </p>
+          <h2 class="mt-2 text-lg font-semibold text-white">音乐库</h2>
+        </div>
+        <ThemeSwitcher />
       </div>
       <nav class="space-y-2 text-sm">
         {items.map((item) => (
