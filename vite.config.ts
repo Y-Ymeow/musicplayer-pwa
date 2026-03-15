@@ -46,6 +46,21 @@ export default defineConfig({
           },
         ],
       },
+      workbox: {
+        // 每次构建生成不同的 hash，强制更新 Service Worker
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+        // 添加时间戳到 precache，确保缓存更新
+        additionalManifestEntries: [
+          {
+            url: "index.html",
+            revision: Date.now().toString(),
+          },
+        ],
+      },
+      // 启用更新提示
+      devOptions: {
+        enabled: false,
+      },
     }),
   ],
   server: {

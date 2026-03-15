@@ -4,6 +4,7 @@ import {
   PlayerBar,
   SidebarContent,
   SongInfoPanel,
+  PWAUpdatePrompt,
 } from "./components/feature";
 import {
   DownloadsPage,
@@ -117,6 +118,8 @@ export function App() {
       <div class="flex-none">
         <PlayerBar />
       </div>
+      {/* PWA 更新提示 */}
+      <PWAUpdatePrompt />
     </div>
   );
 }
