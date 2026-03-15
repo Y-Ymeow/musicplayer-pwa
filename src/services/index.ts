@@ -1,5 +1,5 @@
 export { initDb, ensureDbReady } from './db';
-export { importLocalDirectory, importLocalFiles, listLocalTracks, clearLocalTracks, upsertOnlineTrack } from './library';
+export { importLocalDirectory, importLocalFiles, listLocalTracks, clearLocalTracks, upsertOnlineTrack, migrateLocalTracks } from './library';
 export { initOnlineSources } from './online/sources';
 export { getSources } from './online/registry';
 export { importMusicFreePlugins } from './musicfree';

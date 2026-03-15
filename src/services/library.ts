@@ -1,6 +1,6 @@
 /**
  * 音乐库管理服务
- * 
+ *
  * 提供音乐文件的导入、管理等功能
  * - 支持浏览器 File System Access API
  * - 支持 adapt.js 环境（Tauri 容器）
@@ -8,9 +8,9 @@
  */
 
 import { ensureDbReady, TrackModel } from "./db";
-import { 
-  isAudioFile, 
-  pickAudioDirectory, 
+import {
+  isAudioFile,
+  pickAudioDirectory,
   pickAudioFiles,
   type ExtendedFileHandle,
   getFileHandlePath,
@@ -34,7 +34,7 @@ export async function importLocalFiles() {
   // 在 adapt.js 环境，先请求权限
   if (isAdaptEnvironment()) {
     const granted = await requestStoragePermission(
-      "需要访问您的音乐文件才能播放，请在设置中允许存储权限。"
+      "需要访问您的音乐文件才能播放，请在设置中允许存储权限。",
     );
     if (!granted) {
       console.warn("Storage permission denied");
@@ -53,7 +53,7 @@ export async function importLocalDirectory() {
   // 在 adapt.js 环境，先请求权限
   if (isAdaptEnvironment()) {
     const granted = await requestStoragePermission(
-      "需要访问您的音乐文件才能播放，请在设置中允许存储权限。"
+      "需要访问您的音乐文件才能播放，请在设置中允许存储权限。",
     );
     if (!granted) {
       console.warn("Storage permission denied");
@@ -71,23 +71,77 @@ export async function importLocalDirectory() {
 export async function importFileHandles(handles: ExtendedFileHandle[]) {
   await ensureDbReady();
   const created = [] as number[];
-
+  console.log("[library.ts] Importing handles:", handles);
   for (const handle of handles) {
     if (handle.kind !== "file") continue;
     if (!isAudioFile(handle.name)) continue;
 
     // 获取文件路径（adapt.js 会提供真实路径）
-    const filePath = getFileHandlePath(handle);
-    
+    let filePath = getFileHandlePath(handle);
+
+    // 调试日志
+    console.log("[library.ts] Importing file:", {
+      name: handle.name,
+      kind: handle.kind,
+      hasGetPath: typeof handle.getPath === "function",
+      has_path: !!(handle as any)._path,
+      getPathResult: handle.getPath?.(),
+      _pathResult: (handle as any)._path,
+      filePath,
+    });
+
+    // 如果 getFileHandlePath 返回 null，尝试直接从 handle 读取
+    if (!filePath) {
+      if (typeof handle.getPath === "function") {
+        filePath = handle.getPath();
+        console.log(
+          "[library.ts] Got filePath from handle.getPath():",
+          filePath,
+        );
+      } else if ((handle as any)._path) {
+        filePath = (handle as any)._path;
+        console.log("[library.ts] Got filePath from handle._path:", filePath);
+      }
+    }
+
     // 获取文件 URL（adapt.js 会提供播放 URL）
-    const fileUrl = getFileHandleURL(handle);
+    let fileUrl = getFileHandleURL(handle);
+
+    // 如果 getFileHandleURL 返回 null，尝试直接从 handle 读取
+    if (!fileUrl) {
+      if (typeof handle.getURL === "function") {
+        fileUrl = handle.getURL();
+        console.log("[library.ts] Got fileUrl from handle.getURL():", fileUrl);
+      } else if ((handle as any)._url) {
+        fileUrl = (handle as any)._url;
+        console.log("[library.ts] Got fileUrl from handle._url:", fileUrl);
+      }
+    }
+
+    // 如果还是没有 URL，但有 filePath，尝试调用 resolveLocalFileUrl 获取
+    if (!fileUrl && filePath) {
+      try {
+        const win = window as any;
+        if (win.tauri?.resolveLocalFileUrl) {
+          fileUrl = filePath;
+          console.log(
+            "[library.ts] Got fileUrl from resolveLocalFileUrl:",
+            fileUrl,
+          );
+        }
+      } catch (error) {
+        console.warn("[library.ts] resolveLocalFileUrl failed:", error);
+      }
+    }
+
+    console.log("[library.ts] Final paths:", { filePath, fileUrl });
 
     // 优化：只读取文件片段来获取元数据（256KB 通常足够）
     let metadata = {};
     try {
       // 尝试使用范围读取
       const rangeBuffer = await readFileRange(handle, 0, 262144);
-      
+
       if (rangeBuffer) {
         metadata = await extractMetadataFromRange(rangeBuffer, handle.name);
       } else {
@@ -101,11 +155,11 @@ export async function importFileHandles(handles: ExtendedFileHandle[]) {
 
     const parsed = metadata as Awaited<ReturnType<typeof extractMetadata>>;
     const title = parsed.title || guessTitle(handle.name);
-    
+
     // 生成文件 key
     const file = await handle.getFile();
     const fileKey = makeFileKey(file, handle.name);
-    
+
     // 缓存文件
     cacheLocalFile(fileKey, file);
 
@@ -119,9 +173,10 @@ export async function importFileHandles(handles: ExtendedFileHandle[]) {
         cover: parsed.cover,
         lyric: parsed.lyric,
         sourceType: "local",
-        fileHandle: handle as any,  // 类型转换
+        fileHandle: handle as any, // 类型转换
         fileKey,
         filePath: filePath || undefined,
+        sourceUrl: fileUrl || undefined, // 保存播放 URL（adapt.js 提供的 static:// 或 http://static.localhost/）
         fileName: handle.name,
       });
     } catch (error) {
@@ -137,6 +192,7 @@ export async function importFileHandles(handles: ExtendedFileHandle[]) {
           sourceType: "local",
           fileKey,
           filePath: filePath || undefined,
+          sourceUrl: fileUrl || undefined, // 保存播放 URL
           fileBlob: file,
           fileName: handle.name,
         });
@@ -162,6 +218,62 @@ export async function listLocalTracks() {
 }
 
 /**
+ * 迁移本地音轨：为没有 sourceUrl 的音轨添加播放 URL
+ * 用于修复旧版本导入的音乐文件
+ */
+export async function migrateLocalTracks() {
+  await ensureDbReady();
+
+  // 查找所有没有 sourceUrl 的本地音轨
+  const tracks = await TrackModel.findMany({
+    where: {
+      sourceType: "local",
+      sourceUrl: undefined,
+    },
+  });
+
+  if (tracks.length === 0) {
+    console.log("[migrateLocalTracks] No tracks need migration");
+    return 0;
+  }
+
+  console.log(`[migrateLocalTracks] Found ${tracks.length} tracks to migrate`);
+
+  let migrated = 0;
+
+  for (const track of tracks) {
+    try {
+      // 如果有 filePath，尝试使用 resolveLocalFileUrl 获取播放 URL
+      if (track.filePath) {
+        const win = window as any;
+        if (win.__TAURI__?.resolve_local_file_url) {
+          const url = await win.__TAURI__.resolve_local_file_url(
+            track.filePath,
+          );
+          if (url) {
+            await TrackModel.update(track.id as number, { sourceUrl: url });
+            console.log(
+              `[migrateLocalTracks] Migrated track ${track.id}: ${track.fileName} -> ${url}`,
+            );
+            migrated++;
+          }
+        }
+      }
+    } catch (error) {
+      console.warn(
+        `[migrateLocalTracks] Failed to migrate track ${track.id}:`,
+        error,
+      );
+    }
+  }
+
+  console.log(
+    `[migrateLocalTracks] Migration complete: ${migrated}/${tracks.length} tracks migrated`,
+  );
+  return migrated;
+}
+
+/**
  * 清空本地音轨
  */
 export async function clearLocalTracks() {
@@ -180,14 +292,16 @@ export async function upsertOnlineTrack(data: {
   cover?: string;
   sourceId?: string;
   sourceUrl?: string;
-  sourcePluginUrl?: string;  // 保存插件 URL，用于重新获取播放地址
+  sourcePluginUrl?: string; // 保存插件 URL，用于重新获取播放地址
   lyric?: string;
 }) {
   await ensureDbReady();
   const sourceId = data.sourceId ? String(data.sourceId) : "";
   let existing = null as Awaited<ReturnType<typeof TrackModel.findOne>> | null;
   if (sourceId) {
-    existing = await TrackModel.findOne({ where: { sourceType: "online", sourceId } });
+    existing = await TrackModel.findOne({
+      where: { sourceType: "online", sourceId },
+    });
   }
 
   if (existing?.id) {
@@ -207,7 +321,7 @@ export async function upsertOnlineTrack(data: {
 
 /**
  * 获取音轨的播放 URL
- * 
+ *
  * 优先级：
  * 1. 在线音轨有 sourceUrl：直接返回
  * 2. 在线音轨有 sourcePluginUrl：从插件重新获取播放地址
@@ -217,7 +331,7 @@ export async function upsertOnlineTrack(data: {
  * 6. 本地音轨有 fileBlob：创建 object URL
  */
 export async function getTrackPlaybackUrl(
-  track: Awaited<ReturnType<typeof TrackModel.findOne>>
+  track: Awaited<ReturnType<typeof TrackModel.findOne>>,
 ): Promise<string | null> {
   if (!track) return null;
 
@@ -227,13 +341,17 @@ export async function getTrackPlaybackUrl(
     if (track.sourceUrl) {
       return track.sourceUrl;
     }
-    
+
     // 2. 有 sourcePluginUrl，从插件重新获取
     if (track.sourcePluginUrl && track.sourceId) {
       try {
-        const { getMediaSourceWithPlugin } = await import("./musicfree-runtime");
+        const { getMediaSourceWithPlugin } =
+          await import("./musicfree-runtime");
         const item = { id: track.sourceId };
-        const result = await getMediaSourceWithPlugin(track.sourcePluginUrl, item);
+        const result = await getMediaSourceWithPlugin(
+          track.sourcePluginUrl,
+          item,
+        );
         if (result?.url) {
           // 更新缓存的 sourceUrl
           if (track.id) {
@@ -245,7 +363,7 @@ export async function getTrackPlaybackUrl(
         console.warn("Failed to get playback URL from plugin:", error);
       }
     }
-    
+
     return null;
   }
 
@@ -254,7 +372,7 @@ export async function getTrackPlaybackUrl(
     // 1. 尝试从 fileHandle 获取 URL（adapt.js 环境）
     if (track.fileHandle) {
       const handle = track.fileHandle as ExtendedFileHandle;
-      
+
       // 使用 adapt.js 提供的 getURL() 方法
       if (handle.getURL && typeof handle.getURL === "function") {
         const url = handle.getURL();
@@ -263,10 +381,13 @@ export async function getTrackPlaybackUrl(
           return url;
         }
       }
-      
+
       // 兼容 _url 属性
       if ((handle as any)._url) {
-        console.log("[library.ts] Got URL from handle._url:", (handle as any)._url);
+        console.log(
+          "[library.ts] Got URL from handle._url:",
+          (handle as any)._url,
+        );
         return (handle as any)._url;
       }
     }
@@ -276,7 +397,9 @@ export async function getTrackPlaybackUrl(
       const win = window as any;
       if (win.__TAURI__?.resolve_local_file_url) {
         try {
-          const url = await win.__TAURI__.resolve_local_file_url(track.filePath);
+          const url = await win.__TAURI__.resolve_local_file_url(
+            track.filePath,
+          );
           console.log("[library.ts] Resolved URL from filePath:", url);
           return url;
         } catch (error) {
@@ -321,9 +444,11 @@ export function releaseTrackUrl(url: string) {
 /**
  * 预加载音轨 URL（用于播放列表）
  */
-export async function preloadTrackUrls(tracks: Awaited<ReturnType<typeof TrackModel.findOne>>[]) {
+export async function preloadTrackUrls(
+  tracks: Awaited<ReturnType<typeof TrackModel.findOne>>[],
+) {
   const urlMap = new Map<number, string>();
-  
+
   for (const track of tracks) {
     if (track?.id) {
       const url = await getTrackPlaybackUrl(track);
@@ -332,7 +457,7 @@ export async function preloadTrackUrls(tracks: Awaited<ReturnType<typeof TrackMo
       }
     }
   }
-  
+
   return urlMap;
 }
 

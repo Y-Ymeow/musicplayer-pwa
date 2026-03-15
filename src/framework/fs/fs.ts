@@ -33,6 +33,21 @@ import type {
 interface TauriBridgeInternal {
   _ready: boolean;
   invoke: (cmd: string, payload: Record<string, unknown>) => Promise<unknown>;
+  audio?: {
+    play: (url: string) => Promise<void>;
+    pause: () => void;
+    resume: () => void;
+    stop: () => void;
+    setVolume: (volume: number) => void;
+    setLoop: (loop: boolean) => void;
+    getState: () => Promise<{ positionMs: number; durationMs: number; isPlaying: boolean }>;
+    getPosition: () => Promise<number>;
+    getDuration: () => Promise<number>;
+    getCurrentUrl: () => Promise<string>;
+    seek: (positionMs: number) => void;
+    setProgressCallback: (callback: (state: unknown) => void) => void;
+    AdaptAudio: new (url: string) => unknown;
+  };
 }
 
 /** 全局 Tauri 对象 */

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useState } from "preact/hooks";
 import { Button } from "../components/ui";
 import {
   addTrackToPlaylist,
@@ -7,6 +7,7 @@ import {
   importLocalFiles,
   listLocalTracks,
   listPlaylists,
+  migrateLocalTracks,
 } from "../services";
 import type { PlaylistRecord, TrackRecord } from "../services/db";
 import { playTrack, setQueue } from "../services/player";
@@ -17,7 +18,6 @@ export function LocalPage() {
   const [loading, setLoading] = useState(false);
   const [playlists, setPlaylists] = useState<PlaylistRecord[]>([]);
   const [playlistId, setPlaylistId] = useState<number | "">("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const refresh = async () => {
     const data = await listLocalTracks();
@@ -27,40 +27,74 @@ export function LocalPage() {
   };
 
   useEffect(() => {
-    refresh();
+    // 先执行迁移，再刷新列表
+    migrateLocalTracks().then(() => refresh());
   }, []);
 
   const handleImportFiles = async () => {
-    // 直接触发隐藏的 input 点击
-    fileInputRef.current?.click();
-  };
-
-  const handleFileSelect = async (event: Event) => {
-    const target = event.target as HTMLInputElement;
-    const files = Array.from(target.files ?? []);
-    if (files.length === 0) {
-      return;
-    }
-    
     setLoading(true);
-    
-    // 创建兼容的 handle 对象
-    const handles = files.map((file) => ({
-      kind: "file" as const,
-      name: file.name,
-      async getFile() { return file; },
-      getPath() { return null; },
-      getURL() { return null; },
-    }));
-    
-    const { importFileHandles } = await import("../services/library");
-    await importFileHandles(handles as any);
-    
-    await refresh();
-    setLoading(false);
-    
-    // 清空 input，允许重复选择同一文件
-    target.value = "";
+
+    try {
+      // 优先使用 Tauri 文件对话框（adapt.js 会提供真实路径）
+      if ("tauri" in window) {
+        console.log("[LocalPage] Using Tauri openFileDialog");
+        const paths = await (window.tauri as any).fs.openFileDialog({
+          multiple: true,
+          directory: false,
+          types: [
+            {
+              description: "Audio files",
+              accept: {
+                "audio/*": [
+                  ".mp3",
+                  ".flac",
+                  ".wav",
+                  ".aac",
+                  ".m4a",
+                  ".ogg",
+                  ".opus",
+                ],
+              },
+            },
+          ],
+        });
+        console.log("[LocalPage] Selected paths:", paths);
+
+        if (paths && paths.length > 0) {
+          // 将路径转换为 handle 对象
+          const handles = paths.map((path: string) => ({
+            kind: "file" as const,
+            name: path.split(/[\\/]/).pop() || "file",
+            _path: path,
+            async getFile() {
+              // 通过 Tauri API 获取文件内容
+              const result = await (window.tauri as any).getFileInfo(path);
+              if (result && result.blob) {
+                return new File([result.blob], this.name, { type: result.mimeType });
+              }
+              throw new Error("Failed to get file");
+            },
+            getPath: () => path,
+          }));
+
+          console.log("[LocalPage] Converting paths to handles:", handles.length);
+
+          const { importFileHandles } = await import("../services/library");
+          await importFileHandles(handles as any);
+        }
+      } else {
+        // 降级到 input 方式（但无法获取真实路径）
+        console.warn("[LocalPage] Tauri not available");
+        alert("您的浏览器不支持文件选择器，请使用 Tauri 环境。");
+      }
+    } catch (error) {
+      if ((error as any).name !== "AbortError") {
+        console.error("[LocalPage] Import failed:", error);
+      }
+    } finally {
+      await refresh();
+      setLoading(false);
+    }
   };
 
   const handleClear = async () => {
@@ -79,7 +113,10 @@ export function LocalPage() {
   return (
     <div class="flex h-full flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-6">
       <div>
-        <p class="text-xs uppercase tracking-[0.3em]" style={{ color: "var(--theme-primary-light)" }}>
+        <p
+          class="text-xs uppercase tracking-[0.3em]"
+          style={{ color: "var(--theme-primary-light)" }}
+        >
           Local Library
         </p>
         <h2 class="mt-2 text-xl font-semibold text-white">本地音乐</h2>
@@ -106,17 +143,6 @@ export function LocalPage() {
             </option>
           ))}
         </select>
-        {/* 隐藏的文件输入 */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          accept="audio/*"
-          class="hidden"
-          onChange={handleFileSelect}
-          // capture="user" 在某些移动设备上可以触发系统文件选择器
-          capture="user"
-        />
       </div>
       <div class="flex-1 overflow-y-auto">
         {tracks.length === 0 ? (

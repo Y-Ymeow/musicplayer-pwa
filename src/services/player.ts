@@ -2,6 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import type { TrackRecord } from "./db";
 import { resolveLocalFileUrl } from "../framework/utils/local-file";
 import { getCachedFile } from "./local-cache";
+import { getFileHandleURL } from "../utils/file";
 
 export type RepeatMode = "off" | "one" | "all";
 
@@ -15,15 +16,9 @@ export interface PlayerState {
   repeat: RepeatMode;
 }
 
-// Web Audio API 相关
-let audioCtx: AudioContext | null = null;
-let sourceNode: AudioBufferSourceNode | null = null;
-let audioBuffer: AudioBuffer | null = null;
-let startTime = 0;
-let pausedAt = 0;
+// 使用原生音频播放器（ExoPlayer / libmpv2）
 let progressTimer: number | null = null;
 
-let currentUrl: string | null = null;
 let state: PlayerState = {
   queue: [],
   index: -1,
@@ -33,8 +28,6 @@ let state: PlayerState = {
   duration: 0,
   repeat: "off",
 };
-
-let playRequestId = 0;
 
 const subscribers = new Set<(next: PlayerState) => void>();
 
@@ -55,25 +48,39 @@ function stopProgressTimer() {
   }
 }
 
+/**
+ * 启动进度跟踪定时器
+ * 定期从原生播放器获取播放进度
+ */
 function startProgressTimer() {
   stopProgressTimer();
-  progressTimer = window.setInterval(() => {
-    if (audioCtx && audioBuffer && state.isPlaying) {
-      const elapsed = audioCtx.currentTime - startTime + pausedAt;
-      const newTime = Math.min(elapsed, audioBuffer.duration);
-      if (newTime >= audioBuffer.duration) {
-        // 播放结束
-        handleEnded();
-      } else {
-        setState({ currentTime: newTime });
+  progressTimer = window.setInterval(async () => {
+    if (state.isPlaying && window.__TAURI__?.audio) {
+      try {
+        const [positionMs, durationMs] = await Promise.all([
+          window.__TAURI__.audio.getPosition(),
+          window.__TAURI__.audio.getDuration(),
+        ]);
+        
+        setState({ 
+          currentTime: positionMs / 1000, // 转换为秒
+          duration: durationMs / 1000,
+        });
+        
+        // 检查是否播放结束
+        if (durationMs > 0 && positionMs >= durationMs - 100) {
+          handleEnded();
+        }
+      } catch (e) {
+        console.error("[Player] Failed to get position:", e);
       }
     }
-  }, 250);
+  }, 500); // 每 500ms 更新一次
 }
 
 function handleEnded() {
   stopProgressTimer();
-  
+
   if (state.repeat === "one") {
     void playIndex(state.index);
     return;
@@ -92,149 +99,115 @@ function handleEnded() {
   setState({ isPlaying: false, currentTime: 0 });
 }
 
-function destroySource() {
-  stopProgressTimer();
-  if (sourceNode) {
-    try {
-      sourceNode.stop();
-    } catch {}
-    sourceNode.disconnect();
-    sourceNode = null;
-  }
-  pausedAt = 0;
-}
+/**
+ * 获取音频播放 URL
+ * 本地文件通过 resolveLocalFileUrl 转换为可播放的 URL
+ */
+async function getTrackPlayUrl(track: TrackRecord): Promise<string> {
+  // 本地文件：转换为可播放的 URL
+  if (track.sourceType === "local") {
+    console.log("[Player] Getting play URL for local track:", {
+      fileName: track.fileName,
+      filePath: track.filePath,
+      sourceUrl: track.sourceUrl,
+      hasFileHandle: !!track.fileHandle,
+      hasFileBlob: !!track.fileBlob,
+    });
 
-async function getAudioContext(): Promise<AudioContext> {
-  if (!audioCtx) {
-    audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-  }
-  if (audioCtx.state === "suspended") {
-    await audioCtx.resume();
-  }
-  return audioCtx;
-}
+    // 1. 优先使用 sourceUrl（导入时保存的播放 URL）
+    if (track.sourceUrl) {
+      console.log("[Player] Using saved sourceUrl:", track.sourceUrl);
+      return track.sourceUrl;
+    }
 
-async function prepareAudioBuffer(track: TrackRecord, requestId: number): Promise<AudioBuffer | null> {
-  const ctx = await getAudioContext();
-  
-  // 本地文件：在 Tauri 环境下直接读取整个文件
-  if (track.sourceType === "local" && track.filePath) {
-    const win = window as any;
+    // 2. 使用 fileHandle.getURL()（adapt.js 提供的播放 URL）
+    if (track.fileHandle) {
+      const handleUrl = getFileHandleURL(track.fileHandle as any);
+      if (handleUrl) {
+        console.log("[Player] Got URL from fileHandle.getURL():", handleUrl);
+        return handleUrl;
+      }
+    }
 
-    // 检查是否在 Tauri 环境
-    if (win.__TAURI__?.read_file_content) {
-      try {
-        // 使用 Tauri API 读取整个文件（返回 base64）
-        const result = await win.__TAURI__.read_file_content(track.filePath);
-        if (requestId !== playRequestId) return null;
+    // 3. 使用 filePath + resolveLocalFileUrl
+    if (track.filePath) {
+      console.log("[Player] Resolving filePath:", track.filePath);
+      const url = await resolveLocalFileUrl({
+        filePath: track.filePath,
+        fileName: track.fileName,
+        sourceType: track.sourceType,
+      });
+      console.log("[Player] resolveLocalFileUrl result:", url);
+      if (url) return url;
+    }
 
-        if (result?.data?.content) {
-          const base64 = result.data.content;
-          
-          // 将 base64 解码为 ArrayBuffer
-          const binaryString = atob(base64);
-          const len = binaryString.length;
-          const bytes = new Uint8Array(len);
-          for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
-          
-          // 解码为 AudioBuffer
-          const audioBuffer = await ctx.decodeAudioData(bytes.buffer.slice(0));
-          if (requestId !== playRequestId) return null;
-          
-          return audioBuffer;
-        }
-      } catch (err) {
-        console.warn("Tauri read_file_content failed, falling back:", err);
+    // 4. 尝试从 fileBlob 创建 URL
+    if (track.fileBlob) {
+      console.log("[Player] Creating URL from fileBlob");
+      const blobUrl = URL.createObjectURL(track.fileBlob);
+      console.log("[Player] Created blob URL from fileBlob:", blobUrl);
+      return blobUrl;
+    }
+
+    // 5. 尝试从 fileKey 获取缓存文件
+    if (track.fileKey) {
+      const cachedFile = getCachedFile(track.fileKey);
+      if (cachedFile) {
+        console.log("[Player] Creating URL from cached file");
+        const blobUrl = URL.createObjectURL(cachedFile);
+        console.log("[Player] Created blob URL from cached file:", blobUrl);
+        return blobUrl;
       }
     }
   }
 
-  // 尝试从 fileHandle 获取
-  let blob: Blob | null = null;
-  if (track.sourceType === "local" && track.fileHandle) {
-    blob = await track.fileHandle.getFile();
-    if (requestId !== playRequestId) return null;
-  } else if (track.sourceType === "local" && track.fileBlob) {
-    blob = track.fileBlob;
-  } else if (track.sourceType === "local" && track.fileKey) {
-    const file = getCachedFile(track.fileKey);
-    if (file) blob = file;
-  }
-
-  if (blob) {
-    try {
-      const arrayBuffer = await blob.arrayBuffer();
-      if (requestId !== playRequestId) return null;
-      
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
-      if (requestId !== playRequestId) return null;
-      
-      return audioBuffer;
-    } catch (err) {
-      console.warn("decodeAudioData failed:", err);
-      return null;
-    }
-  }
-
-  // 在线音轨：尝试从 URL 获取
+  // 在线音源：直接使用 sourceUrl
   if (track.sourceUrl) {
-    try {
-      const response = await fetch(track.sourceUrl);
-      const arrayBuffer = await response.arrayBuffer();
-      if (requestId !== playRequestId) return null;
-      
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer.slice(0));
-      if (requestId !== playRequestId) return null;
-      
-      return audioBuffer;
-    } catch (err) {
-      console.warn("fetch and decode failed:", err);
-      return null;
-    }
+    console.log("[Player] Using online sourceUrl:", track.sourceUrl);
+    return track.sourceUrl;
   }
 
-  return null;
+  throw new Error("No playable source found for track");
 }
 
+/**
+ * 播放指定索引的歌曲
+ */
 async function playIndex(index: number) {
   const next = state.queue[index];
   if (!next) return;
-  const requestId = ++playRequestId;
 
   setState({ index, current: next, currentTime: 0, duration: 0 });
 
-  destroySource();
+  // 停止之前的播放
+  stopAudio();
 
-  const buffer = await prepareAudioBuffer(next, requestId);
-  if (!buffer || requestId !== playRequestId) return;
+  try {
+    // 获取可播放的 URL
+    const playUrl = await getTrackPlayUrl(next);
 
-  audioBuffer = buffer;
-  setState({ duration: buffer.duration });
-
-  const ctx = await getAudioContext();
-  
-  sourceNode = ctx.createBufferSource();
-  sourceNode.buffer = buffer;
-  sourceNode.connect(ctx.destination);
-  
-  sourceNode.onended = () => {
-    // 只有在自然结束时才触发（不是手动 stop）
-    if (state.isPlaying && audioCtx && sourceNode) {
-      const elapsed = audioCtx.currentTime - startTime + pausedAt;
-      if (elapsed >= buffer.duration - 0.1) {
-        handleEnded();
-      }
+    // 使用原生播放器播放（ExoPlayer / libmpv2）
+    if (window.__TAURI__?.audio?.play) {
+      console.log("[Player] Using native audio player:", playUrl);
+      await window.__TAURI__.audio.play(playUrl);
+    } else if (window.__TAURI__) {
+      console.log("[Player] Using legacy invoke API:", playUrl);
+      // 兼容旧的 invoke 方式
+      await window.__TAURI__.invoke("audio_play", { url: playUrl });
+    } else {
+      console.warn("[Player] No Tauri bridge, falling back to HTML5 Audio:", playUrl);
+      // 兜底：使用 HTML5 Audio
+      const audio = new Audio(playUrl);
+      audio.play().catch(console.error);
     }
-  };
 
-  startTime = ctx.currentTime;
-  pausedAt = 0;
-  sourceNode.start(0);
-  
-  startProgressTimer();
-  setState({ isPlaying: true });
+    // 启动进度跟踪
+    startProgressTimer();
+    setState({ isPlaying: true });
+  } catch (err) {
+    console.error("[Player] Failed to play track:", err);
+    setState({ isPlaying: false });
+  }
 }
 
 export function setQueue(queue: TrackRecord[], startIndex = 0) {
@@ -256,12 +229,6 @@ export function playTrack(track: TrackRecord, queue?: TrackRecord[]) {
 export function togglePlay() {
   if (!state.current) return;
 
-  // 如果音频缓冲不存在，重新加载
-  if (!audioBuffer) {
-    void playIndex(state.index);
-    return;
-  }
-
   if (state.isPlaying) {
     // 暂停
     pauseAudio();
@@ -271,49 +238,46 @@ export function togglePlay() {
   }
 }
 
+/**
+ * 暂停播放
+ */
 function pauseAudio() {
-  if (!sourceNode || !audioCtx || !audioBuffer) return;
-  
   stopProgressTimer();
-  
-  // 计算暂停位置
-  const elapsed = audioCtx.currentTime - startTime + pausedAt;
-  const pausePosition = Math.min(elapsed, audioBuffer.duration);
-  
-  try {
-    sourceNode.stop();
-  } catch {}
-  sourceNode.disconnect();
-  sourceNode = null;
-  
-  // 保存暂停位置
-  pausedAt = pausePosition;
-  
-  setState({ isPlaying: false, currentTime: pausePosition });
+
+  if (window.__TAURI__?.audio?.pause) {
+    window.__TAURI__.audio.pause();
+  } else if (window.__TAURI__) {
+    window.__TAURI__.invoke("audio_pause", {});
+  }
+
+  setState({ isPlaying: false });
 }
 
+/**
+ * 继续播放
+ */
 function resumeAudio() {
-  if (!audioBuffer || !audioCtx) return;
-  
-  sourceNode = audioCtx.createBufferSource();
-  sourceNode.buffer = audioBuffer;
-  sourceNode.connect(audioCtx.destination);
-  
-  sourceNode.onended = () => {
-    if (state.isPlaying && audioCtx && sourceNode && audioBuffer) {
-      const elapsed = audioCtx.currentTime - startTime + pausedAt;
-      if (elapsed >= audioBuffer.duration - 0.1) {
-        handleEnded();
-      }
-    }
-  };
+  if (window.__TAURI__?.audio?.resume) {
+    window.__TAURI__.audio.resume();
+  } else if (window.__TAURI__) {
+    window.__TAURI__.invoke("audio_resume", {});
+  }
 
-  // 从暂停位置继续
-  startTime = audioCtx.currentTime;
-  sourceNode.start(0, pausedAt);
-  
   startProgressTimer();
   setState({ isPlaying: true });
+}
+
+/**
+ * 停止播放
+ */
+function stopAudio() {
+  stopProgressTimer();
+
+  if (window.__TAURI__?.audio?.stop) {
+    window.__TAURI__.audio.stop();
+  } else if (window.__TAURI__) {
+    window.__TAURI__.invoke("audio_stop", {});
+  }
 }
 
 export function nextTrack() {
@@ -328,42 +292,19 @@ export function prevTrack() {
   }
 }
 
+/**
+ * 跳转到指定位置（秒）
+ */
 export function seekTo(time: number) {
-  if (!audioBuffer) return;
+  const timeMs = time * 1000; // 转换为毫秒
 
-  const clampedTime = Math.max(0, Math.min(time, audioBuffer.duration));
-  pausedAt = clampedTime;
-  setState({ currentTime: clampedTime });
-
-  // 如果正在播放，重新开始
-  if (state.isPlaying) {
-    if (sourceNode) {
-      try {
-        sourceNode.stop();
-      } catch {}
-      sourceNode.disconnect();
-    }
-
-    const ctx = audioCtx!;
-    sourceNode = ctx.createBufferSource();
-    sourceNode.buffer = audioBuffer;
-    sourceNode.connect(ctx.destination);
-
-    sourceNode.onended = () => {
-      if (state.isPlaying && audioCtx && sourceNode && audioBuffer) {
-        const elapsed = audioCtx.currentTime - startTime + pausedAt;
-        if (elapsed >= audioBuffer.duration - 0.1) {
-          handleEnded();
-        }
-      }
-    };
-
-    startTime = ctx.currentTime;
-    pausedAt = 0;
-    sourceNode.start(0, clampedTime);
-
-    startProgressTimer();
+  if (window.__TAURI__?.audio?.seek) {
+    window.__TAURI__.audio.seek(timeMs);
+  } else if (window.__TAURI__) {
+    window.__TAURI__.invoke("audio_seek", { positionMs: timeMs });
   }
+
+  setState({ currentTime: time });
 }
 
 export function toggleRepeat() {
