@@ -6,7 +6,12 @@ import {
   groupLinesByTime,
   parseWordLrc,
 } from "../../utils";
-import { getCurrentTheme, THEME_COLORS } from "../../utils/theme";
+import {
+  getCurrentTheme,
+  THEME_COLORS,
+  getCurrentMode,
+  BASE_COLORS,
+} from "../../utils/theme";
 
 export function LyricsPanel() {
   const player = usePlayerState();
@@ -51,7 +56,9 @@ export function LyricsPanel() {
   return (
     <div class="flex h-full flex-col rounded-3xl border border-white/10 bg-white/5 p-6">
       <div class="flex flex-wrap items-start gap-4">
-        <div class={`h-20 w-20 overflow-hidden rounded-3xl bg-gradient-to-br ${theme.gradientFrom} ${theme.gradientTo}`}>
+        <div
+          class={`h-20 w-20 overflow-hidden rounded-3xl bg-gradient-to-br ${theme.gradientFrom} ${theme.gradientTo}`}
+        >
           {track?.cover ? (
             <img src={track.cover} alt="" class="h-full w-full object-cover" />
           ) : (
@@ -59,7 +66,10 @@ export function LyricsPanel() {
           )}
         </div>
         <div class="min-w-[180px] flex-1">
-          <p class="text-xs uppercase tracking-[0.3em]" style={{ color: theme.primaryLight }}>
+          <p
+            class="text-xs uppercase tracking-[0.3em]"
+            style={{ color: theme.primaryLight }}
+          >
             Lyrics & Song Info
           </p>
           <h2 class="mt-2 text-xl font-semibold text-white">
@@ -133,7 +143,28 @@ export function LyricsPanel() {
                             )
                           : 0;
                         const text = seg.text;
-                        
+                        const colorMode = getCurrentMode();
+
+                        const lyricTextColor =
+                          colorMode == "dark"
+                            ? BASE_COLORS.lyricBaseDark
+                            : BASE_COLORS.lyricBaseLight;
+                        const lyricBgColor =
+                          colorMode == "dark"
+                            ? BASE_COLORS.lyricsDarkTextColor
+                            : BASE_COLORS.lyricsLightTextColor;
+
+                        const baseWhite =
+                          line.segments.length > 1
+                            ? lyricTextColor
+                            : theme.primary;
+                        const beforeColor = isBefore
+                          ? theme.primary
+                          : baseWhite;
+                        const lineColor = isActiveGroup
+                          ? beforeColor
+                          : lyricBgColor;
+
                         // 非逐字歌词：整行高亮用主题色
                         if (!hasWordTiming && isActiveLine) {
                           return (
@@ -145,18 +176,14 @@ export function LyricsPanel() {
                             </span>
                           );
                         }
-                        
+
                         // 逐字歌词
                         return (
                           <span
                             key={`${line.time}-${segIndex}`}
                             class="relative inline-block"
                             style={{
-                              color: isActiveGroup
-                                ? isBefore
-                                  ? theme.primary
-                                  : '#ffffff'
-                                : '#6a7282',
+                              color: lineColor,
                             }}
                           >
                             {text}
@@ -167,10 +194,10 @@ export function LyricsPanel() {
                                 style={{
                                   background: `linear-gradient(90deg, ${theme.primary}, ${theme.primaryHover})`,
                                   backgroundSize: `${progress * 100}% 100%`,
-                                  backgroundRepeat: 'no-repeat',
-                                  WebkitBackgroundClip: 'text',
-                                  backgroundClip: 'text',
-                                  transition: 'background-size 120ms linear',
+                                  backgroundRepeat: "no-repeat",
+                                  WebkitBackgroundClip: "text",
+                                  backgroundClip: "text",
+                                  transition: "background-size 120ms linear",
                                 }}
                               >
                                 {text}

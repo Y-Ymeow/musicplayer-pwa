@@ -11,6 +11,7 @@
   --theme-primary-hover: #10b981;
   --theme-primary-light: rgba(52, 211, 153, 0.3);
   --theme-primary-lighter: rgba(52, 211, 153, 0.1);
+  --theme-bg-gradient: linear-gradient(to bottom, #0a0a0a, #171717);
 }
 
 [data-mode="dark"] {
@@ -27,13 +28,12 @@
 
 body {
   margin: 0;
-  transition: background-color 0.3s ease, color 0.3s ease;
-  background: linear-gradient(to bottom, #0a0a0a, #171717);
+  transition: background 0.3s ease, color 0.3s ease;
+  background: var(--theme-bg-gradient);
   color: #fafafa;
 }
 
 [data-mode="light"] body {
-  background: linear-gradient(to bottom, #f9fafb, #e5e7eb) !important;
   color: #111827;
 }
 

@@ -51,7 +51,7 @@ export function App() {
   };
 
   return (
-    <div class="h-screen flex flex-col bg-neutral-950 text-neutral-100">
+    <div class="h-screen flex flex-col text-neutral-100">
       <div class="flex-1 overflow-hidden">
         {!isDesktop && drawerOpen && (
           <div class="fixed inset-0 z-50">
