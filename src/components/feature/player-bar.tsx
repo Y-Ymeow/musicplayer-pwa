@@ -1,4 +1,4 @@
-import { Button } from '../ui';
+import { Button, Range } from '../ui';
 import { nextTrack, prevTrack, seekTo, togglePlay, toggleRepeat, usePlayerState } from '../../services/player';
 import { getCurrentTheme, THEME_COLORS } from '../../utils/theme';
 import { SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, RotateCcw } from 'lucide-preact';
@@ -49,15 +49,14 @@ export function PlayerBar() {
         </div>
         <div class="flex items-center gap-3 text-xs text-neutral-400">
           <span>{formatTime(player.currentTime)}</span>
-          <input
-            class="h-2 w-full flex-1 cursor-pointer appearance-none rounded-full bg-white/10"
-            type="range"
+          <Range
+            class="flex-1"
             min="0"
             max={player.duration || 0}
             step="0.1"
             value={player.currentTime}
+            progress={progress}
             onInput={(event) => seekTo(Number((event.target as HTMLInputElement).value))}
-            style={{ background: `linear-gradient(90deg, ${theme.primary} ${progress * 100}%, rgba(255,255,255,0.1) 0%)` }}
           />
           <span>{formatTime(player.duration)}</span>
         </div>

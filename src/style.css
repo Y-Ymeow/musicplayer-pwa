@@ -101,6 +101,45 @@ body {
   background: var(--theme-primary-hover);
 }
 
+/* Range 滑块样式 */
+input[type="range"] {
+  --range-thumb-color: var(--theme-primary, #34d399);
+  --range-thumb-hover-color: var(--theme-primary-hover, #10b981);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--range-thumb-color);
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.1s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  background: var(--range-thumb-hover-color);
+  transform: scale(1.1);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--range-thumb-color);
+  cursor: pointer;
+  border: none;
+  transition: background 0.2s ease, transform 0.1s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  background: var(--range-thumb-hover-color);
+  transform: scale(1.1);
+}
+
 @keyframes lyricsFlow {
   0% {
     background-position: 0% 50%;

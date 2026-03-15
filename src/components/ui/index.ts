@@ -3,3 +3,4 @@ export { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 export { Input } from './input';
 export { ThemeSwitcher } from './theme-switcher';
 export { CoverImage } from './cover-image';
+export { Range } from './range';
