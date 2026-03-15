@@ -133,6 +133,20 @@ export function LyricsPanel() {
                             )
                           : 0;
                         const text = seg.text;
+                        
+                        // 非逐字歌词：整行高亮用主题色
+                        if (!hasWordTiming && isActiveLine) {
+                          return (
+                            <span
+                              key={`${line.time}-${segIndex}`}
+                              style={{ color: theme.primary }}
+                            >
+                              {text}
+                            </span>
+                          );
+                        }
+                        
+                        // 逐字歌词
                         return (
                           <span
                             key={`${line.time}-${segIndex}`}
@@ -165,9 +179,6 @@ export function LyricsPanel() {
                           </span>
                         );
                       })}
-                      {!hasWordTiming && isActiveLine && (
-                        <span style={{ color: theme.primary }}> </span>
-                      )}
                     </p>
                   );
                 })}
