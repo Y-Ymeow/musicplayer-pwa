@@ -9,6 +9,8 @@ export interface ThemeConfig {
   name: string;
   primary: string;
   primaryHover: string;
+  primaryLight: string;
+  primaryLighter: string;
   gradientFrom: string;
   gradientTo: string;
   accent: string;
@@ -17,48 +19,60 @@ export interface ThemeConfig {
 export const THEME_COLORS: Record<ThemeColor, ThemeConfig> = {
   emerald: {
     name: '翡翠绿',
-    primary: '#34d399',
-    primaryHover: '#10b981',
+    primary: '#34d399',      // emerald-400
+    primaryHover: '#10b981', // emerald-500
+    primaryLight: 'rgba(52, 211, 153, 0.3)',
+    primaryLighter: 'rgba(52, 211, 153, 0.1)',
     gradientFrom: 'from-emerald-400/60',
     gradientTo: 'to-cyan-400/60',
     accent: 'emerald',
   },
   blue: {
     name: '天空蓝',
-    primary: '#60a5fa',
-    primaryHover: '#3b82f6',
+    primary: '#60a5fa',      // blue-400
+    primaryHover: '#3b82f6', // blue-500
+    primaryLight: 'rgba(96, 165, 250, 0.3)',
+    primaryLighter: 'rgba(96, 165, 250, 0.1)',
     gradientFrom: 'from-blue-400/60',
     gradientTo: 'to-cyan-400/60',
     accent: 'blue',
   },
   purple: {
     name: '紫罗兰',
-    primary: '#a78bfa',
-    primaryHover: '#8b5cf6',
+    primary: '#a78bfa',      // purple-400
+    primaryHover: '#8b5cf6', // purple-500
+    primaryLight: 'rgba(167, 139, 250, 0.3)',
+    primaryLighter: 'rgba(167, 139, 250, 0.1)',
     gradientFrom: 'from-purple-400/60',
     gradientTo: 'to-pink-400/60',
     accent: 'purple',
   },
   red: {
     name: '玫瑰红',
-    primary: '#f87171',
-    primaryHover: '#ef4444',
+    primary: '#f87171',      // red-400
+    primaryHover: '#ef4444', // red-500
+    primaryLight: 'rgba(248, 113, 113, 0.3)',
+    primaryLighter: 'rgba(248, 113, 113, 0.1)',
     gradientFrom: 'from-red-400/60',
     gradientTo: 'to-orange-400/60',
     accent: 'red',
   },
   orange: {
     name: '落日橙',
-    primary: '#fb923c',
-    primaryHover: '#f97316',
+    primary: '#fb923c',      // orange-400
+    primaryHover: '#f97316', // orange-500
+    primaryLight: 'rgba(251, 146, 60, 0.3)',
+    primaryLighter: 'rgba(251, 146, 60, 0.1)',
     gradientFrom: 'from-orange-400/60',
     gradientTo: 'to-amber-400/60',
     accent: 'orange',
   },
   pink: {
     name: '樱花粉',
-    primary: '#f472b6',
-    primaryHover: '#ec4899',
+    primary: '#f472b6',      // pink-400
+    primaryHover: '#ec4899', // pink-500
+    primaryLight: 'rgba(244, 114, 182, 0.3)',
+    primaryLighter: 'rgba(244, 114, 182, 0.1)',
     gradientFrom: 'from-pink-400/60',
     gradientTo: 'to-rose-400/60',
     accent: 'pink',
@@ -102,6 +116,8 @@ export function applyTheme(color: ThemeColor) {
   
   root.style.setProperty('--theme-primary', config.primary);
   root.style.setProperty('--theme-primary-hover', config.primaryHover);
+  root.style.setProperty('--theme-primary-light', config.primaryLight);
+  root.style.setProperty('--theme-primary-lighter', config.primaryLighter);
   root.style.setProperty('--theme-accent', config.accent);
   
   // 添加 data-theme 属性用于 CSS 选择器
@@ -125,4 +141,18 @@ export function getAvailableThemes(): { key: ThemeColor; config: ThemeConfig }[]
     key: key as ThemeColor,
     config,
   }));
+}
+
+/**
+ * 获取当前主题的 CSS 变量值
+ */
+export function getThemeCSSVars() {
+  const theme = getCurrentTheme();
+  const config = THEME_COLORS[theme];
+  return {
+    '--theme-primary': config.primary,
+    '--theme-primary-hover': config.primaryHover,
+    '--theme-primary-light': config.primaryLight,
+    '--theme-primary-lighter': config.primaryLighter,
+  };
 }

@@ -4,8 +4,10 @@ import { addTrackToPlaylist, getLyricWithPlugin, getMediaSourceWithPlugin, listP
 import type { PluginRecord } from '../services/plugins';
 import { playTrack, setQueue, updateCurrentTrack } from '../services/player';
 import type { PlaylistRecord, TrackRecord } from '../services/db';
+import { getCurrentTheme, THEME_COLORS } from '../utils/theme';
 
 export function SearchPage() {
+  const theme = THEME_COLORS[getCurrentTheme()];
   const [plugins, setPlugins] = useState<PluginRecord[]>([]);
   const [pluginId, setPluginId] = useState<number | null>(null);
   const [query, setQuery] = useState('');
@@ -119,7 +121,7 @@ export function SearchPage() {
 
   return (
     <div class="flex h-full min-h-0 flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-      <p class="text-xs uppercase tracking-[0.3em] text-emerald-300/80">Search</p>
+      <p class="text-xs uppercase tracking-[0.3em]" style={{ color: theme.primaryLight }}>Search</p>
       <h2 class="text-xl font-semibold text-white">在线搜索</h2>
       <div class="flex flex-wrap gap-3">
         <select

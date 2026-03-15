@@ -1,12 +1,18 @@
 import { Button } from '../ui';
 import { nextTrack, prevTrack, seekTo, togglePlay, toggleRepeat, usePlayerState } from '../../services/player';
 import { getCurrentTheme, THEME_COLORS } from '../../utils/theme';
+import { SkipBack, SkipForward, Play, Pause, Repeat, Repeat1, RotateCcw } from 'lucide-preact';
 
 export function PlayerBar() {
   const player = usePlayerState();
   const progress = player.duration ? player.currentTime / player.duration : 0;
-  const repeatLabel = player.repeat === 'off' ? '↻' : player.repeat === 'all' ? '🔁' : '🔂';
   const theme = THEME_COLORS[getCurrentTheme()];
+
+  const getRepeatIcon = () => {
+    if (player.repeat === 'off') return <RotateCcw class="h-4 w-4" />;
+    if (player.repeat === 'all') return <Repeat class="h-4 w-4" />;
+    return <Repeat1 class="h-4 w-4" />;
+  };
 
   return (
     <div class="border-t border-white/10 bg-neutral-950/90 backdrop-blur">
@@ -27,12 +33,18 @@ export function PlayerBar() {
             </p>
           </div>
           <div class="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={prevTrack}>⏮</Button>
-            <Button size="icon" onClick={togglePlay} disabled={!player.current}>
-              {player.isPlaying ? '⏸' : '▶'}
+            <Button variant="ghost" size="icon" onClick={prevTrack}>
+              <SkipBack class="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={nextTrack}>⏭</Button>
-            <Button variant="outline" size="icon" onClick={toggleRepeat}>{repeatLabel}</Button>
+            <Button size="icon" onClick={togglePlay} disabled={!player.current}>
+              {player.isPlaying ? <Pause class="h-4 w-4" /> : <Play class="h-4 w-4" />}
+            </Button>
+            <Button variant="ghost" size="icon" onClick={nextTrack}>
+              <SkipForward class="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="icon" onClick={toggleRepeat}>
+              {getRepeatIcon()}
+            </Button>
           </div>
         </div>
         <div class="flex items-center gap-3 text-xs text-neutral-400">

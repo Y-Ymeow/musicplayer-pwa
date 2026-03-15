@@ -1,6 +1,8 @@
 import { Button, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../ui';
+import { getCurrentTheme, THEME_COLORS } from '../../utils/theme';
 
 export function PagePanel() {
+  const theme = THEME_COLORS[getCurrentTheme()];
   return (
     <div class="grid gap-6">
       <Card class="bg-gradient-to-br from-neutral-900 via-neutral-950 to-neutral-900">
@@ -10,7 +12,7 @@ export function PagePanel() {
         </CardHeader>
         <CardContent>
           <div class="grid gap-4 sm:grid-cols-[160px_1fr]">
-            <div class="h-40 w-full rounded-3xl bg-gradient-to-br from-emerald-400/40 to-cyan-400/40" />
+            <div class={`h-40 w-full rounded-3xl bg-gradient-to-br ${theme.gradientFrom} ${theme.gradientTo}`} />
             <div class="space-y-3 text-sm text-neutral-300">
               <p class="text-base font-semibold text-white">Space Walk - Demo Track</p>
               <p>Artist · Album · 2024</p>
@@ -39,7 +41,7 @@ export function PagePanel() {
               class="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm"
             >
               <span class="text-neutral-200">{item}</span>
-              <span class="text-xs text-emerald-300">已连接</span>
+              <span class="text-xs" style={{ color: theme.primary }}>已连接</span>
             </div>
           ))}
         </CardContent>

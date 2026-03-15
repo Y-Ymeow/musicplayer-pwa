@@ -59,7 +59,7 @@ export function LyricsPanel() {
           )}
         </div>
         <div class="min-w-[180px] flex-1">
-          <p class="text-xs uppercase tracking-[0.3em] text-emerald-300/80">
+          <p class="text-xs uppercase tracking-[0.3em]" style={{ color: theme.primaryLight }}>
             Lyrics & Song Info
           </p>
           <h2 class="mt-2 text-xl font-semibold text-white">
@@ -136,13 +136,13 @@ export function LyricsPanel() {
                         return (
                           <span
                             key={`${line.time}-${segIndex}`}
-                            class={isBefore ? "text-emerald-300" : ""}
+                            class={isBefore ? "text-[var(--theme-primary)]" : ""}
                             style={{
                               position: "relative",
                               display: "inline-block",
                               color: isActiveGroup
                                 ? isBefore
-                                  ? "#34d399"
+                                  ? theme.primary
                                   : "#ffffff"
                                 : "#6a7282",
                             }}
@@ -151,8 +151,9 @@ export function LyricsPanel() {
                             {isActive && (
                               <span
                                 aria-hidden="true"
-                                class="pointer-events-none absolute inset-0 bg-gradient-to-r from-emerald-300 to-cyan-300 bg-clip-text text-transparent"
+                                class="pointer-events-none absolute inset-0 bg-clip-text text-transparent"
                                 style={{
+                                  background: `linear-gradient(90deg, ${theme.primary}, ${theme.primaryHover})`,
                                   backgroundSize: `${Math.max(5, progress * 100)}% 100%`,
                                   backgroundRepeat: "no-repeat",
                                   transition: "background-size 120ms linear",
@@ -166,7 +167,7 @@ export function LyricsPanel() {
                         );
                       })}
                       {!hasWordTiming && isActiveLine && (
-                        <span class="text-emerald-300"> </span>
+                        <span style={{ color: theme.primary }}> </span>
                       )}
                     </p>
                   );

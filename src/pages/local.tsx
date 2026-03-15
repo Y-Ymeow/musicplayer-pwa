@@ -11,8 +11,10 @@ import {
 import type { PlaylistRecord, TrackRecord } from "../services/db";
 import { playTrack, setQueue } from "../services/player";
 import { usePagination } from "../utils";
+import { getCurrentTheme, THEME_COLORS } from "../utils/theme";
 
 export function LocalPage() {
+  const theme = THEME_COLORS[getCurrentTheme()];
   const [tracks, setTracks] = useState<TrackRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [playlists, setPlaylists] = useState<PlaylistRecord[]>([]);
@@ -79,7 +81,7 @@ export function LocalPage() {
   return (
     <div class="flex h-full flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-6">
       <div>
-        <p class="text-xs uppercase tracking-[0.3em] text-emerald-300/80">
+        <p class="text-xs uppercase tracking-[0.3em]" style={{ color: theme.primaryLight }}>
           Local Library
         </p>
         <h2 class="mt-2 text-xl font-semibold text-white">本地音乐</h2>

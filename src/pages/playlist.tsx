@@ -4,8 +4,10 @@ import { createPlaylist, listPlaylists, listPlaylistTracks } from '../services';
 import type { PlaylistRecord, TrackRecord } from '../services/db';
 import { usePagination } from '../utils';
 import { setQueue } from '../services/player';
+import { getCurrentTheme, THEME_COLORS } from '../utils/theme';
 
 export function PlaylistPage() {
+  const theme = THEME_COLORS[getCurrentTheme()];
   const [name, setName] = useState('');
   const [items, setItems] = useState<PlaylistRecord[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -43,7 +45,7 @@ export function PlaylistPage() {
 
   return (
     <div class="flex h-full flex-col gap-4 rounded-3xl border border-white/10 bg-white/5 p-6">
-      <p class="text-xs uppercase tracking-[0.3em] text-emerald-300/80">Playlists</p>
+      <p class="text-xs uppercase tracking-[0.3em]" style={{ color: theme.primaryLight }}>Playlists</p>
       <h2 class="text-xl font-semibold text-white">播放列表</h2>
       <div class="flex flex-wrap gap-3">
         <Input
@@ -57,9 +59,8 @@ export function PlaylistPage() {
         {visible.map((item) => (
           <div
             key={item.id}
-            class={`cursor-pointer rounded-2xl border bg-neutral-950/60 p-4 text-sm ${
-              selectedId === item.id ? 'border-emerald-400/50' : 'border-white/10'
-            }`}
+            class="cursor-pointer rounded-2xl border bg-neutral-950/60 p-4 text-sm transition-colors hover:border-[var(--theme-primary)]"
+            style={{ borderColor: selectedId === item.id ? theme.primary : undefined }}
             onClick={() => setSelectedId(item.id ?? null)}
           >
             <p class="text-white">{item.name}</p>

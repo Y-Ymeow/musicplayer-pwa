@@ -1,8 +1,10 @@
 import { Button, ThemeSwitcher } from "../ui";
 import { navigate, useHashRoute } from "../../utils";
+import { getCurrentTheme, THEME_COLORS } from "../../utils/theme";
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const route = useHashRoute("/library");
+  const theme = THEME_COLORS[getCurrentTheme()];
   const items = [
     { label: "歌曲信息", path: "/library" },
     { label: "歌词", path: "/lyrics" },
@@ -17,7 +19,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div class="flex h-full flex-col gap-6">
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-xs uppercase tracking-[0.35em] text-emerald-300/70">
+          <p class="text-xs uppercase tracking-[0.35em]" style={{ color: theme.primaryLight }}>
             Library
           </p>
           <h2 class="mt-2 text-lg font-semibold text-white">音乐库</h2>
@@ -32,11 +34,12 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
               navigate(item.path);
               onNavigate?.();
             }}
-            class={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-neutral-200 transition hover:border-emerald-400/30 hover:text-white ${
+            class={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left text-neutral-200 transition hover:text-white ${
               route === item.path
-                ? "border-emerald-400/50 bg-emerald-400/10"
-                : "border-white/5 bg-white/5"
+                ? "border-[var(--theme-primary)] bg-[var(--theme-primary-lighter)]"
+                : "border-white/5 bg-white/5 hover:border-[var(--theme-primary)]"
             }`}
+            style={route === item.path ? { borderColor: theme.primary, backgroundColor: theme.primaryLighter } : {}}
           >
             <span>{item.label}</span>
           </button>
