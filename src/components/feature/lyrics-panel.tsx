@@ -62,7 +62,7 @@ export function LyricsPanel() {
           {track?.cover ? (
             <img src={track.cover} alt="" class="h-full w-full object-cover" />
           ) : (
-            <img src="/logo.png" alt="" class="h-full w-full object-cover" />
+            <img src="./logo.png" alt="" class="h-full w-full object-cover" />
           )}
         </div>
         <div class="min-w-[180px] flex-1">

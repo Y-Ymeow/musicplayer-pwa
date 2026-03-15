@@ -22,7 +22,7 @@ export function PlayerBar() {
             {player.current?.cover ? (
               <img src={player.current.cover} alt="" class="h-full w-full object-cover" />
             ) : (
-              <img src="/logo.png" alt="" class="h-full w-full object-cover" />
+              <img src="./logo.png" alt="" class="h-full w-full object-cover" />
             )}
           </div>
           <div class="min-w-0 flex-1">

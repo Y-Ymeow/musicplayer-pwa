@@ -22,7 +22,7 @@ export function CoverImage({ src, alt = '', size = 'md', class: className = '' }
       {src ? (
         <img src={src} alt={alt} class="h-full w-full object-cover" />
       ) : (
-        <img src="/logo.png" alt={alt} class="h-full w-full object-cover" />
+        <img src="./logo.png" alt={alt} class="h-full w-full object-cover" />
       )}
     </div>
   );
