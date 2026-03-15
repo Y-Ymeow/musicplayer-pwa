@@ -4,6 +4,7 @@
  */
 
 export type ThemeColor = 'emerald' | 'blue' | 'purple' | 'red' | 'orange' | 'pink';
+export type ThemeMode = 'dark' | 'light';
 
 export interface ThemeConfig {
   name: string;
@@ -79,7 +80,8 @@ export const THEME_COLORS: Record<ThemeColor, ThemeConfig> = {
   },
 };
 
-const STORAGE_KEY = 'musicplayer-theme';
+const THEME_COLOR_KEY = 'musicplayer-theme';
+const THEME_MODE_KEY = 'musicplayer-mode';
 
 /**
  * 获取当前主题色
@@ -88,11 +90,25 @@ export function getCurrentTheme(): ThemeColor {
   if (typeof window === 'undefined') {
     return 'emerald';
   }
-  const stored = localStorage.getItem(STORAGE_KEY);
+  const stored = localStorage.getItem(THEME_COLOR_KEY);
   if (stored && stored in THEME_COLORS) {
     return stored as ThemeColor;
   }
   return 'emerald';
+}
+
+/**
+ * 获取当前模式 (dark/light)
+ */
+export function getCurrentMode(): ThemeMode {
+  if (typeof window === 'undefined') {
+    return 'dark';
+  }
+  const stored = localStorage.getItem(THEME_MODE_KEY);
+  if (stored === 'dark' || stored === 'light') {
+    return stored;
+  }
+  return 'dark';
 }
 
 /**
@@ -102,14 +118,25 @@ export function setTheme(color: ThemeColor) {
   if (typeof window === 'undefined') {
     return;
   }
-  localStorage.setItem(STORAGE_KEY, color);
-  applyTheme(color);
+  localStorage.setItem(THEME_COLOR_KEY, color);
+  applyTheme(color, getCurrentMode());
 }
 
 /**
- * 应用主题色到 CSS 变量
+ * 设置模式 (dark/light)
  */
-export function applyTheme(color: ThemeColor) {
+export function setMode(mode: ThemeMode) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  localStorage.setItem(THEME_MODE_KEY, mode);
+  applyTheme(getCurrentTheme(), mode);
+}
+
+/**
+ * 应用主题色和模式到 CSS 变量
+ */
+export function applyTheme(color: ThemeColor, mode: ThemeMode) {
   const config = THEME_COLORS[color];
   const root = document.documentElement;
   if (!root) return;
@@ -120,8 +147,9 @@ export function applyTheme(color: ThemeColor) {
   root.style.setProperty('--theme-primary-lighter', config.primaryLighter);
   root.style.setProperty('--theme-accent', config.accent);
   
-  // 添加 data-theme 属性用于 CSS 选择器
+  // 设置模式
   root.setAttribute('data-theme', color);
+  root.setAttribute('data-mode', mode);
 }
 
 /**
@@ -129,8 +157,9 @@ export function applyTheme(color: ThemeColor) {
  */
 export function initTheme() {
   const theme = getCurrentTheme();
-  applyTheme(theme);
-  return theme;
+  const mode = getCurrentMode();
+  applyTheme(theme, mode);
+  return { theme, mode };
 }
 
 /**

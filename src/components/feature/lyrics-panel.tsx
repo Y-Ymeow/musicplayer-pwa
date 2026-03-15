@@ -136,28 +136,27 @@ export function LyricsPanel() {
                         return (
                           <span
                             key={`${line.time}-${segIndex}`}
-                            class={isBefore ? "text-[var(--theme-primary)]" : ""}
+                            class="relative inline-block"
                             style={{
-                              position: "relative",
-                              display: "inline-block",
                               color: isActiveGroup
                                 ? isBefore
                                   ? theme.primary
-                                  : "#ffffff"
-                                : "#6a7282",
+                                  : '#ffffff'
+                                : '#6a7282',
                             }}
                           >
                             {text}
                             {isActive && (
                               <span
                                 aria-hidden="true"
-                                class="pointer-events-none absolute inset-0 bg-clip-text text-transparent"
+                                class="pointer-events-none absolute inset-0 text-transparent"
                                 style={{
                                   background: `linear-gradient(90deg, ${theme.primary}, ${theme.primaryHover})`,
-                                  backgroundSize: `${Math.max(5, progress * 100)}% 100%`,
-                                  backgroundRepeat: "no-repeat",
-                                  transition: "background-size 120ms linear",
-                                  WebkitTextFillColor: "transparent",
+                                  backgroundSize: `${progress * 100}% 100%`,
+                                  backgroundRepeat: 'no-repeat',
+                                  WebkitBackgroundClip: 'text',
+                                  backgroundClip: 'text',
+                                  transition: 'background-size 120ms linear',
                                 }}
                               >
                                 {text}

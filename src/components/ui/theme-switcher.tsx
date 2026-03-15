@@ -1,26 +1,42 @@
 import { useEffect, useState } from 'preact/hooks';
-import { getCurrentTheme, setTheme, getAvailableThemes, type ThemeColor } from '../../utils/theme';
+import { getCurrentTheme, getCurrentMode, setTheme, setMode, getAvailableThemes, type ThemeColor } from '../../utils/theme';
+import { Sun, Moon } from 'lucide-preact';
 
 export function ThemeSwitcher() {
   const [currentTheme, setCurrentTheme] = useState<ThemeColor>('emerald');
+  const [currentMode, setCurrentMode] = useState<'dark' | 'light'>('dark');
   const [isOpen, setIsOpen] = useState(false);
   const themes = getAvailableThemes();
 
   useEffect(() => {
     setCurrentTheme(getCurrentTheme());
+    setCurrentMode(getCurrentMode());
   }, []);
 
   const handleThemeChange = (theme: ThemeColor) => {
     setTheme(theme);
     setCurrentTheme(theme);
-    setIsOpen(false);
+  };
+
+  const handleModeToggle = () => {
+    const newMode = currentMode === 'dark' ? 'light' : 'dark';
+    setMode(newMode);
+    setCurrentMode(newMode);
   };
 
   return (
-    <div class="relative">
+    <div class="relative flex items-center gap-1">
+      <button
+        onClick={handleModeToggle}
+        class="rounded-full border border-white/10 bg-neutral-900/70 p-2 text-white hover:bg-neutral-800"
+        title="切换明暗模式"
+      >
+        {currentMode === 'dark' ? <Sun class="h-4 w-4" /> : <Moon class="h-4 w-4" />}
+      </button>
+
       <button
         onClick={() => setIsOpen(!isOpen)}
-        class="rounded-full border border-white/10 bg-neutral-900/70 px-3 py-2 text-xs text-white hover:bg-neutral-800"
+        class="rounded-full border border-white/10 bg-neutral-900/70 p-2 text-white hover:bg-neutral-800"
         title="切换主题色"
       >
         🎨
