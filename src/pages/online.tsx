@@ -3,10 +3,8 @@ import { Button, Input } from '../components/ui';
 import { clearLogs, hasExternalAdapter, importMusicFreePlugins, listPlugins, subscribeLogs, togglePlugin } from '../services';
 import type { LogEntry } from '../services';
 import type { PluginRecord } from '../services/plugins';
-import { getCurrentTheme, THEME_COLORS } from '../utils/theme';
 
 export function OnlinePage() {
-  const theme = THEME_COLORS[getCurrentTheme()];
   const [plugins, setPlugins] = useState<PluginRecord[]>([]);
   const [payload, setPayload] = useState('');
   const [loading, setLoading] = useState(false);
@@ -42,7 +40,7 @@ export function OnlinePage() {
   return (
     <div class="flex h-full min-h-0 flex-col gap-6 rounded-3xl border border-white/10 bg-white/5 p-6">
       <div>
-        <p class="text-xs uppercase tracking-[0.3em]" style={{ color: theme.primaryLight }}>Online Sources</p>
+        <p class="text-xs uppercase tracking-[0.3em]" style={{ color: "var(--theme-primary-light)" }}>Online Sources</p>
         <h2 class="mt-2 text-xl font-semibold text-white">在线音乐</h2>
       </div>
       <div class="space-y-3">

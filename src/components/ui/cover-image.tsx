@@ -14,11 +14,10 @@ const sizeClasses = {
 };
 
 export function CoverImage({ src, alt = '', size = 'md', class: className = '' }: CoverImageProps) {
-  const theme = THEME_COLORS[getCurrentTheme()];
   const sizeClass = sizeClasses[size];
 
   return (
-    <div class={`${sizeClass} overflow-hidden rounded-3xl bg-gradient-to-br ${theme.gradientFrom} ${theme.gradientTo} ${className}`}>
+    <div class={`${sizeClass} overflow-hidden rounded-3xl theme-gradient-bg ${className}`}>
       {src ? (
         <img src={src} alt={alt} class="h-full w-full object-cover" />
       ) : (

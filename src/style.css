@@ -12,6 +12,8 @@
   --theme-primary-light: rgba(52, 211, 153, 0.3);
   --theme-primary-lighter: rgba(52, 211, 153, 0.1);
   --theme-bg-gradient: linear-gradient(to bottom, #0a0a0a, #171717);
+  --theme-gradient-from: emerald-400/60;
+  --theme-gradient-to: cyan-400/60;
 }
 
 [data-mode="dark"] {
@@ -151,4 +153,9 @@ input[type="range"]::-moz-range-thumb:hover {
 
 .animate-lyrics-flow {
   animation: lyricsFlow 1.4s linear infinite;
+}
+
+/* 主题渐变背景类 */
+.theme-gradient-bg {
+  background: linear-gradient(to bottom right, var(--theme-gradient-from), var(--theme-gradient-to));
 }

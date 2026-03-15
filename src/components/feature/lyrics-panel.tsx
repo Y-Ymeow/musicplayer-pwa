@@ -6,17 +6,11 @@ import {
   groupLinesByTime,
   parseWordLrc,
 } from "../../utils";
-import {
-  getCurrentTheme,
-  THEME_COLORS,
-  getCurrentMode,
-  BASE_COLORS,
-} from "../../utils/theme";
+import { getCurrentMode, BASE_COLORS } from "../../utils/theme";
 
 export function LyricsPanel() {
   const player = usePlayerState();
   const track = player.current;
-  const theme = THEME_COLORS[getCurrentTheme()];
   const lyricText =
     track?.lyric && track.lyric !== "[object Object]" ? track.lyric : "";
   const parsed = useMemo(
@@ -56,9 +50,7 @@ export function LyricsPanel() {
   return (
     <div class="flex h-full flex-col rounded-3xl border border-white/10 bg-white/5 p-6">
       <div class="flex flex-wrap items-start gap-4">
-        <div
-          class={`h-20 w-20 overflow-hidden rounded-3xl bg-gradient-to-br ${theme.gradientFrom} ${theme.gradientTo}`}
-        >
+        <div class="h-20 w-20 overflow-hidden rounded-3xl theme-gradient-bg">
           {track?.cover ? (
             <img src={track.cover} alt="" class="h-full w-full object-cover" />
           ) : (
@@ -68,7 +60,7 @@ export function LyricsPanel() {
         <div class="min-w-[180px] flex-1">
           <p
             class="text-xs uppercase tracking-[0.3em]"
-            style={{ color: theme.primaryLight }}
+            style={{ color: "var(--theme-primary-light)" }}
           >
             Lyrics & Song Info
           </p>
@@ -157,9 +149,9 @@ export function LyricsPanel() {
                         const baseWhite =
                           line.segments.length > 1
                             ? lyricTextColor
-                            : theme.primary;
+                            : "var(--theme-primary)";
                         const beforeColor = isBefore
-                          ? theme.primary
+                          ? "var(--theme-primary)"
                           : baseWhite;
                         const lineColor = isActiveGroup
                           ? beforeColor
@@ -170,7 +162,7 @@ export function LyricsPanel() {
                           return (
                             <span
                               key={`${line.time}-${segIndex}`}
-                              style={{ color: theme.primary }}
+                              style={{ color: "var(--theme-primary)" }}
                             >
                               {text}
                             </span>
@@ -192,7 +184,7 @@ export function LyricsPanel() {
                                 aria-hidden="true"
                                 class="pointer-events-none absolute inset-0 text-transparent"
                                 style={{
-                                  background: `linear-gradient(90deg, ${theme.primary}, ${theme.primaryHover})`,
+                                  background: `linear-gradient(90deg, var(--theme-primary), var(--theme-primary-hover))`,
                                   backgroundSize: `${progress * 100}% 100%`,
                                   backgroundRepeat: "no-repeat",
                                   WebkitBackgroundClip: "text",

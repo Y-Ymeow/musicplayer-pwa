@@ -1,10 +1,8 @@
 import { Button, ThemeSwitcher } from "../ui";
 import { navigate, useHashRoute } from "../../utils";
-import { getCurrentTheme, THEME_COLORS } from "../../utils/theme";
 
 export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const route = useHashRoute("/library");
-  const theme = THEME_COLORS[getCurrentTheme()];
   const items = [
     { label: "歌曲信息", path: "/library" },
     { label: "歌词", path: "/lyrics" },
@@ -19,7 +17,7 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
     <div class="flex h-full flex-col gap-6">
       <div class="flex items-center justify-between">
         <div>
-          <p class="text-xs uppercase tracking-[0.35em]" style={{ color: theme.primaryLight }}>
+          <p class="text-xs uppercase tracking-[0.35em]" style={{ color: "var(--theme-primary-light)" }}>
             Library
           </p>
           <h2 class="mt-2 text-lg font-semibold text-white">音乐库</h2>
@@ -39,7 +37,6 @@ export function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                 ? "border-[var(--theme-primary)] bg-[var(--theme-primary-lighter)]"
                 : "border-white/5 bg-white/5 hover:border-[var(--theme-primary)]"
             }`}
-            style={route === item.path ? { borderColor: theme.primary, backgroundColor: theme.primaryLighter } : {}}
           >
             <span>{item.label}</span>
           </button>
