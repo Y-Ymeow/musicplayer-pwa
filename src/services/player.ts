@@ -326,9 +326,10 @@ export function togglePlay() {
   } else {
     // 继续播放
     // 如果是因为播放结束导致的停止（currentTime >= duration），需要重新创建实例
-    const isEnded = state.duration > 0 && state.currentTime >= state.duration - 0.5;
+    const isEnded = state.currentTime === 0 && state.isPlaying === false;
     if (isEnded) {
       // 实例已销毁，重新创建
+      console.log("[Player] Playback ended, restarting player", state);
       void playIndex(state.index);
     } else {
       // 正常暂停后恢复
@@ -428,10 +429,10 @@ export function prevTrack() {
 export function seekTo(time: number) {
   const timeMs = time * 1000; // 转换为毫秒
 
-  if (window.__TAURI__?.audio?.seek) {
-    window.__TAURI__.audio.seek(timeMs);
-  } else if (window.__TAURI__) {
-    window.__TAURI__.invoke("audio_seek", { positionMs: timeMs });
+  if (window.__TAURI__) {
+    window.__TAURI__.invoke("plugin:audioplayer|seek", {
+      positionMs: timeMs,
+    });
   }
 
   setState({ currentTime: time });
