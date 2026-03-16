@@ -325,7 +325,15 @@ export function togglePlay() {
     pauseAudio();
   } else {
     // 继续播放
-    resumeAudio();
+    // 如果是因为播放结束导致的停止（currentTime >= duration），需要重新创建实例
+    const isEnded = state.duration > 0 && state.currentTime >= state.duration - 0.5;
+    if (isEnded) {
+      // 实例已销毁，重新创建
+      void playIndex(state.index);
+    } else {
+      // 正常暂停后恢复
+      resumeAudio();
+    }
   }
 }
 
