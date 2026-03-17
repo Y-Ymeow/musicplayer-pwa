@@ -39,6 +39,7 @@ interface TauriBridgeInternal {
     resume: () => void;
     stop: () => void;
     setVolume: (volume: number) => void;
+    setMuted: (muted: boolean) => void;
     setLoop: (loop: boolean) => void;
     getState: () => Promise<{
       positionMs: number;

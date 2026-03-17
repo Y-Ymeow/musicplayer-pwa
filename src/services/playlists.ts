@@ -11,12 +11,14 @@ export async function createPlaylist(name: string) {
   return PlaylistModel.create({ name, trackIds: [] });
 }
 
-export async function addTrackToPlaylist(playlistId: number, trackId: number) {
+export async function addTrackToPlaylist(playlistId: number | string, trackId: number | string) {
   await ensureDbReady();
   const playlist = await PlaylistModel.findById(playlistId);
   if (!playlist) return null;
   const trackIds = Array.isArray(playlist.trackIds) ? [...playlist.trackIds] : [];
-  if (!trackIds.includes(trackId)) {
+  // 使用字符串比较确保类型一致
+  const trackIdStr = String(trackId);
+  if (!trackIds.some(id => String(id) === trackIdStr)) {
     trackIds.push(trackId);
   }
   return PlaylistModel.update(playlistId, { trackIds });
@@ -25,12 +27,13 @@ export async function addTrackToPlaylist(playlistId: number, trackId: number) {
 /**
  * 从播放列表删除歌曲
  */
-export async function removeTrackFromPlaylist(playlistId: number, trackId: number) {
+export async function removeTrackFromPlaylist(playlistId: number | string, trackId: number | string) {
   await ensureDbReady();
   const playlist = await PlaylistModel.findById(playlistId);
   if (!playlist) return null;
+  const trackIdStr = String(trackId);
   const trackIds = (Array.isArray(playlist.trackIds) ? [...playlist.trackIds] : []).filter(
-    id => id !== trackId
+    id => String(id) !== trackIdStr
   );
   return PlaylistModel.update(playlistId, { trackIds });
 }
@@ -38,7 +41,7 @@ export async function removeTrackFromPlaylist(playlistId: number, trackId: numbe
 /**
  * 清空播放列表
  */
-export async function clearPlaylist(playlistId: number) {
+export async function clearPlaylist(playlistId: number | string) {
   await ensureDbReady();
   return PlaylistModel.update(playlistId, { trackIds: [] });
 }
@@ -46,12 +49,12 @@ export async function clearPlaylist(playlistId: number) {
 /**
  * 删除播放列表
  */
-export async function deletePlaylist(playlistId: number) {
+export async function deletePlaylist(playlistId: number | string) {
   await ensureDbReady();
   return PlaylistModel.delete(playlistId);
 }
 
-export async function listPlaylistTracks(playlistId: number): Promise<TrackRecord[]> {
+export async function listPlaylistTracks(playlistId: number | string): Promise<TrackRecord[]> {
   await ensureDbReady();
   const playlist = await PlaylistModel.findById(playlistId);
   if (!playlist) return [];
@@ -60,5 +63,5 @@ export async function listPlaylistTracks(playlistId: number): Promise<TrackRecor
   const map = new Map(all.map((track) => [track.id, track]));
   return (playlist.trackIds || [])
     .map((id) => map.get(id))
-    .filter((item): item is TrackRecord => Boolean(item && ids.has(item.id as number)));
+    .filter((item): item is TrackRecord => Boolean(item));
 }

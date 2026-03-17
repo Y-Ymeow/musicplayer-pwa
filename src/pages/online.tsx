@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Button, Input } from '../components/ui';
-import { clearLogs, hasExternalAdapter, importMusicFreePlugins, listPlugins, subscribeLogs, togglePlugin } from '../services';
+import { clearLogs, hasExternalAdapter, importMusicFreePlugins, listPlugins, subscribeLogs, togglePlugin, type PluginRecord } from '../services';
+import { LocalStorage } from '../framework/storages';
 import type { LogEntry } from '../services';
-import type { PluginRecord } from '../services/plugins';
+
+// 插件列表 URL 存储
+const storage = new LocalStorage('musicplayer:online');
+const PLUGIN_LIST_URL_KEY = 'plugin-list-url';
 
 export function OnlinePage() {
   const [plugins, setPlugins] = useState<PluginRecord[]>([]);
@@ -14,6 +18,12 @@ export function OnlinePage() {
   const [showLogs, setShowLogs] = useState(false);
 
   useEffect(() => {
+    // 从 localStorage 读取上次输入的地址
+    storage.init();
+    storage.get<string>(PLUGIN_LIST_URL_KEY).then((entry) => {
+      if (entry?.value) setPayload(entry.value);
+    });
+    
     listPlugins('musicfree').then(setPlugins);
     if (!hasExternalAdapter()) {
       setCorsTip('未检测到油猴/插件/容器适配，跨域接口可能失败。');
@@ -30,6 +40,8 @@ export function OnlinePage() {
       setMessage(`已导入 ${count} 个插件`);
       const list = await listPlugins('musicfree');
       setPlugins(list);
+      // 保存输入的地址到 localStorage
+      await storage.set(PLUGIN_LIST_URL_KEY, payload.trim());
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -56,7 +68,7 @@ export function OnlinePage() {
       <div class="flex-1 min-h-0 overflow-y-auto space-y-3">
         {plugins.map((plugin) => (
           <div
-            key={plugin.id}
+            key={String(plugin.id)}
             class="flex items-center justify-between rounded-2xl border border-white/10 bg-neutral-950/60 px-4 py-3 text-sm"
           >
             <div>
@@ -67,7 +79,7 @@ export function OnlinePage() {
               variant={plugin.enabled ? 'secondary' : 'outline'}
               onClick={async () => {
                 if (!plugin.id) return;
-                await togglePlugin(plugin.id, !plugin.enabled);
+                await togglePlugin(String(plugin.id), !plugin.enabled);
                 const list = await listPlugins('musicfree');
                 setPlugins(list);
               }}

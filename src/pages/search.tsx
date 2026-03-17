@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'preact/hooks';
 import { Button, Input } from '../components/ui';
-import { addTrackToPlaylist, getLyricWithPlugin, getMediaSourceWithPlugin, listPlaylists, listPlugins, searchWithPlugin, upsertOnlineTrack } from '../services';
-import type { PluginRecord } from '../services/plugins';
+import { addTrackToPlaylist, getLyricWithPlugin, getMediaSourceWithPlugin, listPlaylists, listPlugins, searchWithPlugin, upsertOnlineTrack, type PluginRecord } from '../services';
 import { playTrack, setQueue, updateCurrentTrack } from '../services/player';
 import type { PlaylistRecord, TrackRecord } from '../services/db';
 
 export function SearchPage() {
   const [plugins, setPlugins] = useState<PluginRecord[]>([]);
-  const [pluginId, setPluginId] = useState<number | null>(null);
+  const [pluginId, setPluginId] = useState<number | string | null>(null);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -16,7 +15,7 @@ export function SearchPage() {
   const [message, setMessage] = useState('');
   const [activePluginUrl, setActivePluginUrl] = useState<string>('');
   const [playlists, setPlaylists] = useState<PlaylistRecord[]>([]);
-  const [playlistId, setPlaylistId] = useState<number | ''>('');
+  const [playlistId, setPlaylistId] = useState<number | string | ''>('');
 
   useEffect(() => {
     listPlugins('musicfree').then((list) => {
@@ -28,7 +27,7 @@ export function SearchPage() {
 
   const handleSearch = async () => {
     if (!query.trim() || !pluginId) return;
-    const plugin = plugins.find((item) => item.id === pluginId);
+    const plugin = plugins.find((item) => String(item.id) === String(pluginId));
     if (!plugin) return;
     setLoading(true);
     setMessage('');
@@ -108,7 +107,7 @@ export function SearchPage() {
         sourceUrl: media?.url,
       });
       if (track?.id) {
-        await addTrackToPlaylist(playlistId, track.id);
+        await addTrackToPlaylist(String(playlistId), String(track.id));
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : String(error));
@@ -124,12 +123,12 @@ export function SearchPage() {
       <div class="flex flex-wrap gap-3">
         <select
           class="h-11 rounded-2xl border border-white/10 bg-neutral-950/40 px-3 text-sm text-neutral-100"
-          value={pluginId ?? ''}
-          onChange={(event) => setPluginId(Number((event.target as HTMLSelectElement).value))}
+          value={String(pluginId ?? '')}
+          onChange={(event) => setPluginId((event.target as HTMLSelectElement).value)}
         >
           <option value="">选择插件</option>
           {plugins.map((plugin) => (
-            <option key={plugin.id} value={plugin.id}>
+            <option key={String(plugin.id)} value={String(plugin.id)}>
               {plugin.name}
             </option>
           ))}
@@ -142,15 +141,15 @@ export function SearchPage() {
         <Button onClick={handleSearch} disabled={loading}>搜索</Button>
         <select
           class="h-11 rounded-2xl border border-white/10 bg-neutral-950/40 px-3 text-sm text-neutral-100"
-          value={playlistId}
+          value={String(playlistId)}
           onChange={(event) => {
             const value = (event.target as HTMLSelectElement).value;
-            setPlaylistId(value ? Number(value) : '');
+            setPlaylistId(value || '');
           }}
         >
           <option value="">加入播放列表</option>
           {playlists.map((playlist) => (
-            <option key={playlist.id} value={playlist.id}>
+            <option key={String(playlist.id)} value={String(playlist.id)}>
               {playlist.name}
             </option>
           ))}

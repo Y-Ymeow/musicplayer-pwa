@@ -176,7 +176,7 @@ export function LocalPage() {
                     disabled={!playlistId}
                     onClick={async () => {
                       if (!playlistId || !track.id) return;
-                      await addTrackToPlaylist(playlistId, track.id);
+                      await addTrackToPlaylist(playlistId, typeof track.id === 'number' ? track.id : Number(track.id));
                       await refresh();
                     }}
                   >

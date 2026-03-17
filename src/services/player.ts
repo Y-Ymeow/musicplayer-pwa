@@ -4,6 +4,7 @@ import { resolveLocalFileUrl } from "../framework/utils/local-file";
 import { getCachedFile } from "./local-cache";
 import { getFileHandleURL } from "../utils/file";
 import { TrackModel } from "./db";
+import { LocalStorage } from "../framework/storages";
 
 export type RepeatMode = "off" | "one" | "all";
 
@@ -15,12 +16,47 @@ export interface PlayerState {
   currentTime: number;
   duration: number;
   repeat: RepeatMode;
+  volume: number; // 音量 0-1
+  isMuted: boolean; // 是否静音
 }
 
 // 使用原生音频播放器（ExoPlayer / libmpv2）
 let progressTimer: number | null = null;
 let lastPositionMs = 0;
 let consecutiveZeroDurationCount = 0;
+
+// 存储管理器 - 使用 LocalStorage
+const storage = new LocalStorage('musicplayer');
+
+// 初始化存储
+storage.init().catch(console.error);
+
+const VOLUME_KEY = 'player-volume';
+const MUTED_KEY = 'player-muted';
+
+// 从存储中读取音量设置
+async function loadVolumeSettings(): Promise<{ volume: number; isMuted: boolean }> {
+  try {
+    const volumeEntry = await storage.get<number>(VOLUME_KEY);
+    const mutedEntry = await storage.get<boolean>(MUTED_KEY);
+    return {
+      volume: volumeEntry?.value ?? 0.8,
+      isMuted: mutedEntry?.value ?? false,
+    };
+  } catch {
+    return { volume: 0.8, isMuted: false };
+  }
+}
+
+// 保存音量设置
+async function saveVolumeSettings(volume: number, isMuted: boolean) {
+  try {
+    await storage.set(VOLUME_KEY, volume);
+    await storage.set(MUTED_KEY, isMuted);
+  } catch {
+    // 忽略存储错误
+  }
+}
 
 let state: PlayerState = {
   queue: [],
@@ -30,6 +66,8 @@ let state: PlayerState = {
   currentTime: 0,
   duration: 0,
   repeat: "off",
+  volume: 0.8, // 默认音量 80%
+  isMuted: false,
 };
 
 const subscribers = new Set<(next: PlayerState) => void>();
@@ -113,7 +151,8 @@ function startProgressTimer() {
           positionMs > 0 &&
           Math.floor(positionMs / 1000) % 5 === 0
         ) {
-          savePlaybackProgress(state.current.id, positionMs / 1000);
+          // 暂时禁用播放进度保存（会频繁触发 SQLite upsert）
+          // savePlaybackProgress(state.current.id, positionMs / 1000);
         }
       } catch (e) {
         console.error("[Player] Failed to get position:", e);
@@ -125,7 +164,10 @@ function startProgressTimer() {
 /**
  * 保存播放进度到数据库
  */
-async function savePlaybackProgress(trackId: number, currentTime: number) {
+async function savePlaybackProgress(
+  trackId: number | string,
+  currentTime: number,
+) {
   try {
     await TrackModel.update(trackId, {
       // 如果有 duration 字段，可以保存
@@ -278,10 +320,14 @@ async function playIndex(index: number) {
     if (window.__TAURI__?.audio?.play) {
       console.log("[Player] Using native audio player:", playUrl);
       await window.__TAURI__.audio.play(playUrl);
+      // 设置音量
+      setVolume(state.volume);
     } else if (window.__TAURI__) {
       console.log("[Player] Using legacy invoke API:", playUrl);
       // 兼容旧的 invoke 方式
       await window.__TAURI__.invoke("audio_play", { url: playUrl });
+      // 设置音量
+      setVolume(state.volume);
     } else {
       console.warn(
         "[Player] No Tauri bridge, falling back to HTML5 Audio:",
@@ -289,6 +335,7 @@ async function playIndex(index: number) {
       );
       // 兜底：使用 HTML5 Audio
       const audio = new Audio(playUrl);
+      audio.volume = state.volume;
       audio.play().catch(console.error);
     }
 
@@ -307,6 +354,7 @@ export function setQueue(queue: TrackRecord[], startIndex = 0) {
 }
 
 export function playTrack(track: TrackRecord, queue?: TrackRecord[]) {
+  console.log(track);
   if (queue && queue.length > 0) {
     // 找到当前 track 在队列中的索引
     const trackId = track.id;
@@ -453,10 +501,71 @@ export function updateCurrentTrack(partial: Partial<TrackRecord>) {
   setState({ current: updated, queue: nextQueue });
 }
 
+/**
+ * 设置音量
+ * @param volume 音量值 0-1
+ */
+export async function setVolume(volume: number) {
+  const clampedVolume = Math.max(0, Math.min(1, volume));
+  
+  if (window.__TAURI__?.audio?.setVolume) {
+    window.__TAURI__.audio.setVolume(clampedVolume);
+  } else if (window.__TAURI__) {
+    window.__TAURI__.invoke("audio_set_volume", { volume: clampedVolume });
+  }
+  
+  setState({ volume: clampedVolume, isMuted: clampedVolume === 0 });
+  // 保存音量设置
+  await saveVolumeSettings(clampedVolume, clampedVolume === 0);
+}
+
+/**
+ * 切换静音
+ * 原理：静音时保存当前音量并设为 0，取消静音时恢复音量
+ */
+export async function toggleMute() {
+  const newMuted = !state.isMuted;
+  
+  if (newMuted) {
+    // 静音：保存当前音量并设为 0
+    window.__TAURI__?.audio?.setVolume(0);
+    window.__TAURI__?.invoke("audio_set_volume", { volume: 0 });
+  } else {
+    // 取消静音：恢复音量
+    window.__TAURI__?.audio?.setVolume(state.volume);
+    window.__TAURI__?.invoke("audio_set_volume", { volume: state.volume });
+  }
+  
+  setState({ isMuted: newMuted });
+  // 保存静音设置
+  await saveVolumeSettings(state.volume, newMuted);
+}
+
+/**
+ * 设置静音状态
+ */
+export async function setMuted(muted: boolean) {
+  if (muted) {
+    window.__TAURI__?.audio?.setVolume(0);
+    window.__TAURI__?.invoke("audio_set_volume", { volume: 0 });
+  } else {
+    window.__TAURI__?.audio?.setVolume(state.volume);
+    window.__TAURI__?.invoke("audio_set_volume", { volume: state.volume });
+  }
+  setState({ isMuted: muted });
+  // 保存静音设置
+  await saveVolumeSettings(state.volume, muted);
+}
+
 export function usePlayerState() {
   const [player, setPlayer] = useState(state);
 
   useEffect(() => {
+    // 应用启动时加载音量设置
+    loadVolumeSettings().then(({ volume, isMuted }) => {
+      setState({ volume, isMuted });
+    });
+    
     const handler = (next: PlayerState) => setPlayer(next);
     subscribers.add(handler);
     return () => {

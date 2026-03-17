@@ -227,6 +227,11 @@ function createPluginConsole(url: string) {
 function createAxiosShim(scopeUrl?: string) {
   const scope = scopeUrl ? `plugin:${scopeUrl}` : "plugin";
   const axios = async (config: any) => {
+    if (config.method.toUpperCase() == "POST") {
+      config.headers["x-requested-with"] = "XMLHttpRequest";
+    }
+    console.log("Config:", config);
+
     return axios.request(config);
   };
 
@@ -256,7 +261,7 @@ function createAxiosShim(scopeUrl?: string) {
     try {
       const response = await requestManager.get(url, {
         params: config.params,
-        headers: config.headers,
+        headers: { ...config.headers },
         responseType: config.responseType ?? "text",
       });
       return {
@@ -283,7 +288,7 @@ function createAxiosShim(scopeUrl?: string) {
     try {
       const response = await requestManager.post(url, data, {
         params: config.params,
-        headers: config.headers,
+        headers: { ...config.headers, "x-requested-with": "XMLHttpRequest" },
         responseType: config.responseType ?? "text",
       });
       return {
@@ -311,7 +316,10 @@ function createAxiosShim(scopeUrl?: string) {
       const response = await requestManager.request({
         url: config.url,
         method: config.method || "GET",
-        headers: config.headers,
+        headers:
+          (config.method || "POST") == "POST"
+            ? { ...config.headers, "x-requested-with": "XMLHttpRequest" }
+            : config.headers,
         params: config.params,
         body: config.data ?? config.body,
         responseType: config.responseType ?? "text",

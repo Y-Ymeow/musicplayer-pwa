@@ -163,8 +163,12 @@ export async function importFileHandles(handles: ExtendedFileHandle[]) {
     // 缓存文件
     cacheLocalFile(fileKey, file);
 
+    // 在 Tauri 环境下，不存储 fileHandle（无法序列化），只存储 filePath 和 sourceUrl
+    const isTauri = !!(window as any).__TAURI__;
+    
     let track;
-    try {
+    if (isTauri) {
+      // Tauri 环境：使用 filePath 和 sourceUrl
       track = await TrackModel.create({
         title,
         artist: parsed.artist,
@@ -173,15 +177,14 @@ export async function importFileHandles(handles: ExtendedFileHandle[]) {
         cover: parsed.cover,
         lyric: parsed.lyric,
         sourceType: "local",
-        fileHandle: handle as any, // 类型转换
         fileKey,
         filePath: filePath || undefined,
-        sourceUrl: fileUrl || undefined, // 保存播放 URL（adapt.js 提供的 static:// 或 http://static.localhost/）
+        sourceUrl: fileUrl || undefined,
         fileName: handle.name,
-      });
-    } catch (error) {
-      // DataCloneError: fileHandle 无法被克隆时，降级存储
-      if (error instanceof DOMException && error.name === "DataCloneError") {
+      } as any);
+    } else {
+      // 浏览器环境：尝试存储 fileHandle
+      try {
         track = await TrackModel.create({
           title,
           artist: parsed.artist,
@@ -190,14 +193,32 @@ export async function importFileHandles(handles: ExtendedFileHandle[]) {
           cover: parsed.cover,
           lyric: parsed.lyric,
           sourceType: "local",
+          fileHandle: handle as any,
           fileKey,
           filePath: filePath || undefined,
-          sourceUrl: fileUrl || undefined, // 保存播放 URL
-          fileBlob: file,
+          sourceUrl: fileUrl || undefined,
           fileName: handle.name,
         });
-      } else {
-        throw error;
+      } catch (error) {
+        // DataCloneError: fileHandle 无法被克隆时，降级存储
+        if (error instanceof DOMException && error.name === "DataCloneError") {
+          track = await TrackModel.create({
+            title,
+            artist: parsed.artist,
+            album: parsed.album,
+            duration: parsed.duration,
+            cover: parsed.cover,
+            lyric: parsed.lyric,
+            sourceType: "local",
+            fileKey,
+            filePath: filePath || undefined,
+            sourceUrl: fileUrl || undefined,
+            fileBlob: file,
+            fileName: handle.name,
+          });
+        } else {
+          throw error;
+        }
       }
     }
     created.push(track.id as number);
@@ -447,7 +468,7 @@ export function releaseTrackUrl(url: string) {
 export async function preloadTrackUrls(
   tracks: Awaited<ReturnType<typeof TrackModel.findOne>>[],
 ) {
-  const urlMap = new Map<number, string>();
+  const urlMap = new Map<number | string, string>();
 
   for (const track of tracks) {
     if (track?.id) {

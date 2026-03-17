@@ -1,5 +1,4 @@
-import type { PluginRecord } from './plugins';
-import { replacePlugins } from './plugins';
+import { replacePlugins, type PluginRecord } from './plugins';
 import { requestJson } from './request';
 
 export interface MusicFreePluginList {

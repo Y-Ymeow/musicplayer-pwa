@@ -125,32 +125,48 @@ export const THEME_COLORS: Record<ThemeColor, ThemeConfig> = {
 const THEME_COLOR_KEY = "musicplayer-theme";
 const THEME_MODE_KEY = "musicplayer-mode";
 
+// 全局缓存，避免频繁读取 localStorage
+let cachedTheme: ThemeColor | null = null;
+let cachedMode: ThemeMode | null = null;
+
 /**
  * 获取当前主题色
  */
 export function getCurrentTheme(): ThemeColor {
+  if (cachedTheme) {
+    return cachedTheme;
+  }
+  
   if (typeof window === "undefined") {
     return "emerald";
   }
   const stored = localStorage.getItem(THEME_COLOR_KEY);
   if (stored && stored in THEME_COLORS) {
-    return stored as ThemeColor;
+    cachedTheme = stored as ThemeColor;
+    return cachedTheme;
   }
-  return "emerald";
+  cachedTheme = "emerald";
+  return cachedTheme;
 }
 
 /**
  * 获取当前模式 (dark/light)
  */
 export function getCurrentMode(): ThemeMode {
+  if (cachedMode) {
+    return cachedMode;
+  }
+  
   if (typeof window === "undefined") {
     return "dark";
   }
   const stored = localStorage.getItem(THEME_MODE_KEY);
   if (stored === "dark" || stored === "light") {
-    return stored;
+    cachedMode = stored;
+    return cachedMode;
   }
-  return "dark";
+  cachedMode = "dark";
+  return cachedMode;
 }
 
 /**
@@ -160,6 +176,7 @@ export function setTheme(color: ThemeColor) {
   if (typeof window === "undefined") {
     return;
   }
+  cachedTheme = color;
   localStorage.setItem(THEME_COLOR_KEY, color);
   applyTheme(color, getCurrentMode());
 }
@@ -171,6 +188,7 @@ export function setMode(mode: ThemeMode) {
   if (typeof window === "undefined") {
     return;
   }
+  cachedMode = mode;
   localStorage.setItem(THEME_MODE_KEY, mode);
   applyTheme(getCurrentTheme(), mode);
 }

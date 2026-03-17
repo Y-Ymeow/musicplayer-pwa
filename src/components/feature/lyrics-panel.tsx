@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef } from "preact/hooks";
 import { usePlayerState } from "../../services/player";
 import {
   getActiveLineIndex,
-  getActiveSegmentIndex,
   groupLinesByTime,
   parseWordLrc,
 } from "../../utils";
@@ -98,108 +97,91 @@ export function LyricsPanel() {
                 class="space-y-2"
               >
                 {group.lines.map((line, lineIndex) => {
-                  const activeSegment = getActiveSegmentIndex(
-                    line,
-                    player.currentTime,
-                  );
-                  const hasWordTiming = line.segments.length > 1;
                   const isActiveLine = isActiveGroup && lineIndex === 0;
+                  const hasWordTiming = line.segments.length > 1;
+                  const colorMode = getCurrentMode();
+
+                  const lyricTextColor =
+                    colorMode == "dark"
+                      ? BASE_COLORS.lyricBaseDark
+                      : BASE_COLORS.lyricBaseLight;
+                  const lyricBgColor =
+                    colorMode == "dark"
+                      ? BASE_COLORS.lyricsDarkTextColor
+                      : BASE_COLORS.lyricsLightTextColor;
+
+                  // 非逐字歌词：激活 group 的所有行都高亮（主题色）
+                  if (!hasWordTiming) {
+                    return (
+                      <p
+                        key={`${line.time}-${lineIndex}`}
+                        class={isActiveGroup ? "" : "text-gray-500"}
+                        style={{
+                          whiteSpace: "pre-wrap",
+                          color: isActiveGroup ? "var(--theme-primary)" : undefined,
+                        }}
+                      >
+                        {line.segments.map((seg, segIndex) => (
+                          <span key={`${line.time}-${segIndex}`}>
+                            {seg.text}
+                          </span>
+                        ))}
+                      </p>
+                    );
+                  }
+
+                  // 逐字歌词：使用整行连续渐变动画
+                  const lineStartTime = line.segments[0].time;
+                  const lineEndTime = line.segments[line.segments.length - 1].time;
+                  const lineDuration = lineEndTime - lineStartTime;
+
+                  // 计算当前时间相对于整行的进度（0-100%）
+                  const elapsed = player.currentTime - lineStartTime;
+                  const progressPercent = isActiveGroup
+                    ? Math.min(100, Math.max(0, (elapsed / lineDuration) * 100))
+                    : 0;
+
                   return (
                     <p
                       key={`${line.time}-${lineIndex}`}
-                      class={isActiveGroup ? "text-white" : "text-gray-500"}
-                      style={{ whiteSpace: "pre-wrap" }}
+                      class="relative inline-block"
+                      style={{
+                        whiteSpace: "pre-wrap",
+                        color: isActiveGroup ? "white" : "text-gray-500",
+                      }}
                     >
-                      {line.segments.map((seg, segIndex) => {
-                        const isBefore =
-                          hasWordTiming &&
-                          isActiveGroup &&
-                          segIndex < activeSegment;
-                        const isActive =
-                          hasWordTiming &&
-                          isActiveGroup &&
-                          segIndex === activeSegment;
-                        const nextTime =
-                          segIndex + 1 < line.segments.length
-                            ? line.segments[segIndex + 1].time
-                            : (lines[lines.indexOf(line) + 1]?.time ??
-                              seg.time + 1);
-                        const duration = Math.max(0.2, nextTime - seg.time);
-                        const progress = isActive
-                          ? Math.min(
-                              1,
-                              Math.max(
-                                0,
-                                (player.currentTime - seg.time) / duration,
-                              ),
-                            )
-                          : 0;
-                        const text = seg.text;
-                        const colorMode = getCurrentMode();
+                      {/* 背景文字层（用于占位） */}
+                      <span aria-hidden="true" style={{ visibility: "hidden" }}>
+                        {line.segments.map((seg, segIndex) => (
+                          <span key={`${line.time}-${segIndex}`}>{seg.text}</span>
+                        ))}
+                      </span>
 
-                        const lyricTextColor =
-                          colorMode == "dark"
-                            ? BASE_COLORS.lyricBaseDark
-                            : BASE_COLORS.lyricBaseLight;
-                        const lyricBgColor =
-                          colorMode == "dark"
-                            ? BASE_COLORS.lyricsDarkTextColor
-                            : BASE_COLORS.lyricsLightTextColor;
+                      {/* 前景渐变层 - 霓虹灯效果 */}
+                      {isActiveGroup && (
+                        <span
+                          class="absolute inset-0 pointer-events-none"
+                          style={{
+                            background: `linear-gradient(90deg, var(--theme-primary) ${progressPercent}%, white ${progressPercent}%)`,
+                            WebkitBackgroundClip: "text",
+                            backgroundClip: "text",
+                            color: "transparent",
+                          }}
+                        >
+                          {line.segments.map((seg, segIndex) => (
+                            <span key={`${line.time}-${segIndex}`}>{seg.text}</span>
+                          ))}
+                        </span>
+                      )}
 
-                        const baseWhite =
-                          line.segments.length > 1
-                            ? lyricTextColor
-                            : "var(--theme-primary)";
-                        const beforeColor = isBefore
-                          ? "var(--theme-primary)"
-                          : baseWhite;
-                        const lineColor = isActiveGroup
-                          ? beforeColor
-                          : lyricBgColor;
-
-                        // 非逐字歌词：整行高亮用主题色
-                        if (!hasWordTiming && isActiveLine) {
-                          return (
-                            <span
-                              key={`${line.time}-${segIndex}`}
-                              style={{ color: "var(--theme-primary)" }}
-                            >
-                              {text}
-                            </span>
-                          );
-                        }
-
-                        // 逐字歌词：使用 CSS 动画实现渐变效果
-                        return (
-                          <span
-                            key={`${line.time}-${segIndex}`}
-                            class="relative inline-block"
-                            style={{
-                              color: lineColor,
-                            }}
-                          >
-                            {text}
-                            {isActive && (
-                              <span
-                                aria-hidden="true"
-                                class="pointer-events-none absolute inset-0 text-transparent"
-                                style={{
-                                  background: `linear-gradient(90deg, var(--theme-primary), var(--theme-primary-hover))`,
-                                  backgroundSize: "100% 100%",
-                                  backgroundRepeat: "no-repeat",
-                                  WebkitBackgroundClip: "text",
-                                  backgroundClip: "text",
-                                  // 使用 CSS 动画实现平滑渐变
-                                  animation: `lyric-progress ${duration}s linear forwards`,
-                                  animationPlayState: "running",
-                                }}
-                              >
-                                {text}
-                              </span>
-                            )}
-                          </span>
-                        );
-                      })}
+                      {/* 非激活时的文字层（灰色） */}
+                      {!isActiveGroup && (
+                        <span class="absolute inset-0" style={{ color: "#6b7280" }}>
+                          {line.segments.map((seg, segIndex) => (
+                            <span key={`${line.time}-${segIndex}`}>{seg.text}</span>
+                          ))}
+                        </span>
+                      )}
                     </p>
                   );
                 })}

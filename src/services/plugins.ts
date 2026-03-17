@@ -1,40 +1,107 @@
-import { Model, field } from '../framework/indexeddb';
-import type { ModelData } from '../framework/indexeddb';
-import { db, ensureDbReady } from './db';
+/**
+ * 插件管理服务 - 使用 LocalStorage 存储
+ */
 
-export interface PluginRecord extends ModelData {
-  id?: number;
-  source: 'musicfree';
-  name: string;
-  url: string;
-  version?: string;
-  enabled: boolean;
-}
+import { LocalStorage } from "../framework/storages";
+import type { PluginRecord } from "./db";
 
-export const PluginModel = new Model<PluginRecord>(db, 'plugins', {
-  id: field.primary(),
-  source: field.string({ required: true }),
-  name: field.string({ required: true }),
-  url: field.string({ required: true }),
-  version: field.string(),
-  enabled: field.boolean({ required: true }),
-});
+export type { PluginRecord };
 
-export async function listPlugins(source: 'musicfree' | 'all' = 'all') {
-  await ensureDbReady();
-  if (source === 'all') return PluginModel.findMany({ orderBy: { createdAt: 'desc' } });
-  return PluginModel.findMany({ where: { source }, orderBy: { createdAt: 'desc' } });
-}
+// 插件存储
+const storage = new LocalStorage("musicplayer:plugins");
+const PLUGINS_KEY = "data";
 
-export async function replacePlugins(source: 'musicfree', items: Omit<PluginRecord, 'id'>[]) {
-  await ensureDbReady();
-  await PluginModel.deleteMany({ source });
-  for (const item of items) {
-    await PluginModel.create(item);
+/**
+ * 从存储中获取所有插件
+ */
+async function getAllPlugins(): Promise<PluginRecord[]> {
+  try {
+    await storage.init();
+    const entry = await storage.get<PluginRecord[]>(PLUGINS_KEY);
+    return entry?.value ?? [];
+  } catch (e) {
+    console.error('[plugins] getAllPlugins failed:', e);
+    return [];
   }
 }
 
-export async function togglePlugin(id: number, enabled: boolean) {
-  await ensureDbReady();
-  await PluginModel.update(id, { enabled });
+/**
+ * 保存所有插件到存储
+ */
+async function saveAllPlugins(plugins: PluginRecord[]): Promise<void> {
+  try {
+    await storage.init();
+    await storage.set(PLUGINS_KEY, plugins);
+  } catch (e) {
+    console.error('Failed to save plugins:', e);
+  }
+}
+
+export async function listPlugins(source: "musicfree" | "all" = "all") {
+  const plugins = await getAllPlugins();
+  console.log("[plugins] listPlugins plugins:", plugins);
+
+  // 确保 plugins 是数组
+  if (!Array.isArray(plugins)) {
+    console.warn("[plugins] plugins is not an array:", plugins);
+    return [];
+  }
+
+  if (source === "all") {
+    return plugins.sort((a, b) => {
+      const timeA = (a.createdAt as number) ?? 0;
+      const timeB = (b.createdAt as number) ?? 0;
+      return timeB - timeA;
+    });
+  }
+
+  return plugins
+    .filter((p) => p?.source === source)
+    .sort((a, b) => {
+      const timeA = (a.createdAt as number) ?? 0;
+      const timeB = (b.createdAt as number) ?? 0;
+      return timeB - timeA;
+    });
+}
+
+export async function replacePlugins(
+  source: "musicfree",
+  items: Omit<PluginRecord, "id">[],
+) {
+  const plugins = await getAllPlugins();
+
+  // 删除指定来源的插件
+  const filtered = plugins.filter((p) => p.source !== source);
+
+  // 添加新插件
+  const now = Date.now();
+  const newPlugins: PluginRecord[] = items.map((item, index) => {
+    const itemRecord = item as Record<string, unknown>;
+    const plugin: PluginRecord = {
+      id: now + index,
+      source: "musicfree",
+      name: String(itemRecord.name ?? ""),
+      url: String(itemRecord.url ?? ""),
+      version: itemRecord.version as string | undefined,
+      enabled: Boolean(itemRecord.enabled ?? true),
+      createdAt: now,
+      updatedAt: now,
+    };
+    return plugin;
+  });
+
+  await saveAllPlugins([...filtered, ...newPlugins]);
+}
+
+export async function togglePlugin(id: number | string, enabled: boolean) {
+  const plugins = await getAllPlugins();
+
+  const updated = plugins.map((p) => {
+    if (p.id === id) {
+      return { ...p, enabled, updatedAt: Date.now() };
+    }
+    return p;
+  });
+
+  await saveAllPlugins(updated);
 }

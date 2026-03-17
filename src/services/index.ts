@@ -1,4 +1,5 @@
-export { initDb, ensureDbReady } from './db';
+export { initDb, ensureDbReady, getDatabaseType } from './db';
+export type { TrackRecord, PlaylistRecord, SourceRecord, DownloadRecord, PluginRecord } from './db';
 export { importLocalDirectory, importLocalFiles, listLocalTracks, clearLocalTracks, upsertOnlineTrack, migrateLocalTracks } from './library';
 export { initOnlineSources } from './online/sources';
 export { getSources } from './online/registry';
@@ -8,8 +9,8 @@ export { hasExternalAdapter } from './request';
 export { searchWithPlugin, getMediaSourceWithPlugin, getLyricWithPlugin } from './musicfree-runtime';
 export { clearLogs, getLogs, subscribeLogs } from './logs';
 export type { LogEntry } from './logs';
-export { 
-  addTrackToPlaylist, 
+export {
+  addTrackToPlaylist,
   listPlaylistTracks,
   removeTrackFromPlaylist,
   clearPlaylist,

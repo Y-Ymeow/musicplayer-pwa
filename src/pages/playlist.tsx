@@ -59,7 +59,7 @@ export function PlaylistPage() {
             key={item.id}
             class="cursor-pointer rounded-2xl border bg-neutral-950/60 p-4 text-sm transition-colors hover:border-[var(--theme-primary)]"
             style={{ borderColor: selectedId === item.id ? "var(--theme-primary)" : undefined }}
-            onClick={() => setSelectedId(item.id ?? null)}
+            onClick={() => setSelectedId(typeof item.id === 'number' ? item.id : Number(item.id))}
           >
             <p class="text-white">{item.name}</p>
             <p class="text-xs text-neutral-500">{item.trackIds?.length ?? 0} 首</p>

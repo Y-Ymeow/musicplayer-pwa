@@ -6,6 +6,8 @@ import {
   togglePlay,
   toggleRepeat,
   usePlayerState,
+  setVolume,
+  toggleMute,
 } from "../../services/player";
 import {
   SkipBack,
@@ -15,6 +17,8 @@ import {
   Repeat,
   Repeat1,
   RotateCcw,
+  Volume,
+  VolumeX,
 } from "lucide-preact";
 
 export function PlayerBar() {
@@ -72,6 +76,36 @@ export function PlayerBar() {
             <Button variant="outline" size="icon" onClick={toggleRepeat}>
               {getRepeatIcon()}
             </Button>
+            {/* 音量控制 */}
+            <div class="flex items-center gap-1.5">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleMute}
+                class="h-8 w-8"
+              >
+                {player.isMuted || player.volume === 0 ? (
+                  <VolumeX class="h-4 w-4" />
+                ) : (
+                  <Volume class="h-4 w-4" />
+                )}
+              </Button>
+              <Range
+                class="w-24"
+                min="0"
+                max="1"
+                step="0.01"
+                value={player.isMuted ? 0 : player.volume}
+                progress={player.isMuted ? 0 : player.volume}
+                onInput={(event) => {
+                  const newVolume = Number((event.target as HTMLInputElement).value);
+                  setVolume(newVolume);
+                  if (newVolume > 0 && player.isMuted) {
+                    toggleMute();
+                  }
+                }}
+              />
+            </div>
           </div>
         </div>
         <div class="flex items-center gap-3 text-xs text-neutral-400">
