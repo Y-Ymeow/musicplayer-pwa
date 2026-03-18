@@ -125,9 +125,7 @@ export class LocalStorage implements IStorage {
     try {
       const fullKey = this.getFullKey(key);
       // Tauri 环境下 localStorage.getItem 可能返回 Promise
-      const dataOrPromise: any = localStorage.getItem(fullKey);
-      const data =
-        dataOrPromise instanceof Promise ? await dataOrPromise : dataOrPromise;
+      const data: any = localStorage.getItem(fullKey);
 
       if (data === null) {
         return null;

@@ -133,10 +133,6 @@ let cachedMode: ThemeMode | null = null;
  * 获取当前主题色
  */
 export function getCurrentTheme(): ThemeColor {
-  if (cachedTheme) {
-    return cachedTheme;
-  }
-  
   if (typeof window === "undefined") {
     return "emerald";
   }
@@ -156,7 +152,7 @@ export function getCurrentMode(): ThemeMode {
   if (cachedMode) {
     return cachedMode;
   }
-  
+
   if (typeof window === "undefined") {
     return "dark";
   }
@@ -213,10 +209,16 @@ export function applyTheme(color: ThemeColor, mode: ThemeMode) {
       ? `linear-gradient(to bottom, ${config.darkBgStart}, ${config.darkBgEnd})`
       : `linear-gradient(to bottom, ${config.lightBgStart}, ${config.lightBgEnd})`;
   root.style.setProperty("--theme-bg-gradient", bgColor);
-  
+
   // 设置渐变色（用于封面背景等）
-  root.style.setProperty("--theme-gradient-from", config.gradientFrom.replace(/^[^-]+-/, ''));
-  root.style.setProperty("--theme-gradient-to", config.gradientTo.replace(/^[^-]+-/, ''));
+  root.style.setProperty(
+    "--theme-gradient-from",
+    config.gradientFrom.replace(/^[^-]+-/, ""),
+  );
+  root.style.setProperty(
+    "--theme-gradient-to",
+    config.gradientTo.replace(/^[^-]+-/, ""),
+  );
 
   // 设置模式
   root.setAttribute("data-theme", color);
