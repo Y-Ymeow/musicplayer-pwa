@@ -35,7 +35,7 @@ export class DatabaseManager {
    */
   private log(...args: unknown[]): void {
     if (this.config.debug) {
-      console.log('[IndexedDB]', ...args);
+      // console.log('[IndexedDB]', ...args);
     }
   }
 
@@ -369,9 +369,17 @@ export class DatabaseManager {
       const store = transaction.objectStore(storeName);
 
       const count = await new Promise<number>((resolve, reject) => {
-        const request = store.count();
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
+        // 某些浏览器（如旧版 Safari）不支持 count() 方法，使用 getAllKeys 替代
+        if (typeof store.count === 'function') {
+          const request = store.count();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        } else {
+          // 回退方案：使用 getAllKeys 获取所有键然后计数
+          const request = store.getAllKeys();
+          request.onsuccess = () => resolve((request.result as any[]).length);
+          request.onerror = () => reject(request.error);
+        }
       });
 
       stats.counts[storeName] = count;

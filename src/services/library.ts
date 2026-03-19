@@ -165,7 +165,7 @@ export async function importFileHandles(handles: ExtendedFileHandle[]) {
 
     // 在 Tauri 环境下，不存储 fileHandle（无法序列化），只存储 filePath 和 sourceUrl
     const isTauri = !!(window as any).__TAURI__;
-    
+
     let track;
     if (isTauri) {
       // Tauri 环境：使用 filePath 和 sourceUrl

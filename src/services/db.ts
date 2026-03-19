@@ -1,12 +1,19 @@
 /**
  * 数据库服务 - 支持 IndexedDB 和 SQLite 双后端
- * 
+ *
  * - 浏览器环境：使用 IndexedDB
  * - Tauri 环境：使用 SQLite（避免 IndexedDB 被莫名清空）
  */
 
-import { createDatabase, field, Model, type ModelData } from '../framework/indexeddb';
-import { SQLiteModel, createSQLiteModel, setGlobalBridge, getGlobalBridge, getSQLite } from '../framework/sqlite';
+import { createDatabase, field, Model, type ModelData, type QueryOptions as IDBQueryOptions } from '../framework/indexeddb';
+import {
+  SQLiteModel,
+  setGlobalBridge,
+  getGlobalBridge,
+  getSQLite,
+  type SQLiteModelQueryOptions,
+  type SQLiteSortDirection,
+} from '../framework/sqlite';
 import { isAdaptEnvironment } from '../utils/file';
 
 export type TrackSourceType = 'local' | 'online';
@@ -115,6 +122,36 @@ function createSQLiteModelInstance<T extends MusicPlayerRecord>(
   return new SQLiteModel<T>(storage, tableName, { tableName, primaryKey: 'dataId' });
 }
 
+// ==================== 类型定义 ====================
+
+/**
+ * 统一的查询选项（兼容 IndexedDB 和 SQLite）
+ */
+export interface UnifiedQueryOptions<T extends MusicPlayerRecord> {
+  where?: Partial<T>;
+  orderBy?: Record<string, 'asc' | 'desc'>;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * 批量操作结果
+ */
+export interface BatchResult<T> {
+  success: number;
+  failed: number;
+  errors: Array<{ item: T; error: Error }>;
+}
+
+/**
+ * 更新/删除结果
+ */
+export interface UpdateDeleteResult {
+  updated?: number;
+  deleted?: number;
+  failed: number;
+}
+
 // ==================== 模型封装 ====================
 
 /**
@@ -134,12 +171,10 @@ class UnifiedModel<T extends MusicPlayerRecord> {
    * 检查是否在 Tauri 环境且已初始化
    */
   private get isSQLite(): boolean {
-    // 安全地检查 bridge 是否存在
     try {
       const bridge = getGlobalBridge();
       return isAdaptEnvironment() && bridge !== null;
     } catch {
-      // getGlobalBridge 抛出错误说明还没设置
       return false;
     }
   }
@@ -168,24 +203,76 @@ class UnifiedModel<T extends MusicPlayerRecord> {
     }
   }
 
+  /**
+   * 将统一查询选项转换为 SQLite 查询选项（使用新的 sort API）
+   */
+  private toSQLiteOptions(options?: UnifiedQueryOptions<T>): SQLiteModelQueryOptions {
+    if (!options) return {};
+
+    const sqliteOptions: SQLiteModelQueryOptions = {};
+
+    if (options.where) {
+      sqliteOptions.where = options.where as Record<string, unknown>;
+    }
+
+    // 将 orderBy 转换为 sort 格式（适配新的 API）
+    if (options.orderBy) {
+      const sortEntries = Object.entries(options.orderBy);
+      if (sortEntries.length === 1) {
+        // 单字段：转换为 { field: 'createdAt', order: 'desc' } 格式
+        const [field, direction] = sortEntries[0];
+        sqliteOptions.sort = { field, order: direction as 'asc' | 'desc' };
+      } else if (sortEntries.length > 1) {
+        // 多字段：转换为数组格式
+        sqliteOptions.sort = sortEntries.map(([field, order]) => ({
+          field,
+          order: order as 'asc' | 'desc',
+        }));
+      }
+    }
+
+    if (options.limit) {
+      sqliteOptions.limit = options.limit;
+    }
+
+    if (options.offset) {
+      sqliteOptions.offset = options.offset;
+    }
+
+    return sqliteOptions;
+  }
+
+  /**
+   * 将统一查询选项转换为 IndexedDB 查询选项
+   */
+  private toIDBOptions(options?: UnifiedQueryOptions<T>): IDBQueryOptions {
+    if (!options) return {};
+    return options as IDBQueryOptions;
+  }
+
+  /**
+   * 为 SQLite 结果添加 id 字段（id = dataId）
+   */
+  private withId(result: T): T {
+    return { ...result, id: (result as any).dataId } as T;
+  }
+
   async create(data: Partial<T>): Promise<T> {
     if (this.isSQLite) {
       this.ensureSQLiteModel();
       if (this.sqliteModel) {
         const result = await this.sqliteModel.create(data);
-        // 为 SQLite 结果添加 id 字段（id = dataId）
-        return { ...result, id: result.dataId } as T;
+        return this.withId(result);
       }
     }
     return await this.idbModel!.create(data);
   }
 
-  async createMany(dataList: Partial<T>[]): Promise<{ success: number; failed: number; errors: Array<{ item: Partial<T>; error: Error }> }> {
+  async createMany(dataList: Partial<T>[]): Promise<BatchResult<Partial<T>>> {
     if (this.isSQLite) {
       this.ensureSQLiteModel();
       if (this.sqliteModel) {
         const result = await this.sqliteModel.createMany(dataList);
-        // 转换错误类型
         return {
           success: result.success,
           failed: result.failed,
@@ -194,7 +281,7 @@ class UnifiedModel<T extends MusicPlayerRecord> {
       }
     }
     // IndexedDB 降级处理
-    const result = { success: 0, failed: 0, errors: [] as Array<{ item: Partial<T>; error: Error }> };
+    const result: BatchResult<Partial<T>> = { success: 0, failed: 0, errors: [] };
     for (const data of dataList) {
       try {
         await this.create(data);
@@ -212,8 +299,7 @@ class UnifiedModel<T extends MusicPlayerRecord> {
       this.ensureSQLiteModel();
       if (this.sqliteModel) {
         const result = await this.sqliteModel.findById(String(id));
-        // 为 SQLite 结果添加 id 字段（id = dataId）
-        return result ? { ...result, id: result.dataId } : null;
+        return result ? this.withId(result) : null;
       }
     }
     return await this.idbModel!.findOne({ where: { id } });
@@ -223,31 +309,29 @@ class UnifiedModel<T extends MusicPlayerRecord> {
     if (this.isSQLite) {
       this.ensureSQLiteModel();
       if (this.sqliteModel) {
-        // 转换查询条件
         const where = options.where as Record<string, unknown>;
         const id = where.id;
         if (id !== undefined) {
           const result = await this.sqliteModel.findOne(String(id));
-          return result ? { ...result, id: result.dataId } : null;
+          return result ? this.withId(result) : null;
         }
-        // 使用 findMany 并取第一条
         const results = await this.sqliteModel.findMany({ where });
-        return results.length > 0 ? { ...results[0], id: results[0].dataId } : null;
+        return results.length > 0 ? this.withId(results[0]) : null;
       }
     }
     return await this.idbModel!.findOne(options);
   }
 
-  async findMany(options?: { where?: Partial<T>; orderBy?: Record<string, 'asc' | 'desc'>; limit?: number; offset?: number }): Promise<T[]> {
+  async findMany(options?: UnifiedQueryOptions<T>): Promise<T[]> {
     if (this.isSQLite) {
       this.ensureSQLiteModel();
       if (this.sqliteModel) {
-        const results = await this.sqliteModel.findMany(options as any);
-        // 为 SQLite 结果添加 id 字段（id = dataId）
-        return results.map(r => ({ ...r, id: r.dataId } as T));
+        const sqliteOptions = this.toSQLiteOptions(options);
+        const results = await this.sqliteModel.findMany(sqliteOptions);
+        return results.map(r => this.withId(r));
       }
     }
-    return await this.idbModel!.findMany(options as any);
+    return await this.idbModel!.findMany(this.toIDBOptions(options));
   }
 
   async findAll(): Promise<T[]> {
@@ -255,8 +339,7 @@ class UnifiedModel<T extends MusicPlayerRecord> {
       this.ensureSQLiteModel();
       if (this.sqliteModel) {
         const results = await this.sqliteModel.findAll();
-        // 为 SQLite 结果添加 id 字段（id = dataId）
-        return results.map(r => ({ ...r, id: r.dataId } as T));
+        return results.map(r => this.withId(r));
       }
     }
     return await this.idbModel!.findMany();
@@ -267,8 +350,7 @@ class UnifiedModel<T extends MusicPlayerRecord> {
       this.ensureSQLiteModel();
       if (this.sqliteModel) {
         const result = await this.sqliteModel.update(String(id), data);
-        // 为 SQLite 结果添加 id 字段（id = dataId）
-        return result ? { ...result, id: result.dataId } : null;
+        return result ? this.withId(result) : null;
       }
     }
     return await this.idbModel!.update(typeof id === 'number' ? id : Number(id), data);
@@ -278,7 +360,7 @@ class UnifiedModel<T extends MusicPlayerRecord> {
     if (this.isSQLite) {
       this.ensureSQLiteModel();
       if (this.sqliteModel) {
-        return await this.sqliteModel.updateMany(where as any, data);
+        return await this.sqliteModel.updateMany(where as Record<string, unknown>, data);
       }
     }
     // IndexedDB 降级处理
@@ -310,7 +392,7 @@ class UnifiedModel<T extends MusicPlayerRecord> {
     if (this.isSQLite) {
       this.ensureSQLiteModel();
       if (this.sqliteModel) {
-        return await this.sqliteModel.deleteMany(where as any);
+        return await this.sqliteModel.deleteMany(where as Record<string, unknown>);
       }
     }
     // IndexedDB 降级处理

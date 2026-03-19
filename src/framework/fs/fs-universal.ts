@@ -63,20 +63,17 @@ export class FS implements IFS {
     // 1. 优先检测 Tauri
     if (this._detectTauri()) {
       this._fsType = 'tauri';
-      console.log('[FS] 使用 Tauri FS');
       return true;
     }
 
     // 2. 浏览器环境 - 仅支持文件选择器
     if (typeof window !== 'undefined') {
       this._fsType = 'web-file-picker';
-      console.log('[FS] 浏览器环境，仅支持文件选择器');
       return true;
     }
 
     // 3. 不支持的环境
     this._fsType = 'unsupported';
-    console.warn('[FS] 当前环境不支持文件访问');
     return false;
   }
 

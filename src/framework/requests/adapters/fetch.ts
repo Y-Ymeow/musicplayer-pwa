@@ -168,7 +168,6 @@ export class FetchAdapter implements IRequestAdapter {
       }
 
       const data = await this.parseResponse<T>(response, config.responseType);
-      console.log(data);
 
       return {
         data,

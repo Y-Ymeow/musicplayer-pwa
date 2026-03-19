@@ -5,7 +5,7 @@ import {
   groupLinesByTime,
   parseWordLrc,
 } from "../../utils";
-import { getCurrentMode, BASE_COLORS } from "../../utils/theme";
+import { getCurrentMode, getCurrentTheme, THEME_COLORS, BASE_COLORS } from "../../utils/theme";
 
 export function LyricsPanel() {
   const player = usePlayerState();
@@ -19,6 +19,12 @@ export function LyricsPanel() {
   const lines = parsed?.lines ?? [];
   const activeLineIndex = getActiveLineIndex(lines, player.currentTime);
   const groups = useMemo(() => groupLinesByTime(lines), [lines]);
+  
+  // 获取当前主题色，确保在移动端也能正确显示
+  const currentTheme = getCurrentTheme();
+  const themeConfig = THEME_COLORS[currentTheme];
+  const colorMode = getCurrentMode();
+  
   const activeGroupIndex = useMemo(() => {
     if (activeLineIndex < 0) return -1;
     let cursor = 0;
@@ -47,26 +53,26 @@ export function LyricsPanel() {
   }, [activeLineIndex]);
 
   return (
-    <div class="flex h-full flex-col rounded-3xl border border-white/10 bg-white/5 p-6">
+    <div class="flex h-full min-h-[400px] flex-col rounded-3xl border border-white/10 bg-neutral-900/80 backdrop-blur-md p-4 md:p-6">
       <div class="flex flex-wrap items-start gap-4">
-        <div class="h-20 w-20 overflow-hidden rounded-3xl theme-gradient-bg">
+        <div class="h-20 w-20 flex-none overflow-hidden rounded-3xl theme-gradient-bg">
           {track?.cover ? (
             <img src={track.cover} alt="" class="h-full w-full object-cover" />
           ) : (
             <img src="./logo.png" alt="" class="h-full w-full object-cover" />
           )}
         </div>
-        <div class="min-w-[180px] flex-1">
+        <div class="min-w-0 flex-1">
           <p
             class="text-xs uppercase tracking-[0.3em]"
-            style={{ color: "var(--theme-primary-light)" }}
+            style={{ color: themeConfig.primary }}
           >
             Lyrics & Song Info
           </p>
-          <h2 class="mt-2 text-xl font-semibold text-white">
+          <h2 class="mt-2 truncate text-lg font-semibold text-white md:text-xl">
             {track?.title ?? "暂无播放"}
           </h2>
-          <p class="mt-1 text-sm text-neutral-400">
+          <p class="mt-1 truncate text-sm text-neutral-400">
             {track?.artist
               ? `${track.artist} · ${track.album ?? ""}`
               : "选择一首歌曲"}
@@ -79,8 +85,11 @@ export function LyricsPanel() {
 
       <div
         ref={scrollRef}
-        class="mt-6 flex-1 space-y-4 overflow-y-auto pr-3 text-center text-lg leading-relaxed text-neutral-200"
-        style={{ scrollbarGutter: "stable" }}
+        class="mt-4 flex-1 space-y-3 overflow-y-auto pr-2 text-center text-base leading-relaxed md:mt-6 md:space-y-4 md:pr-3 md:text-lg"
+        style={{ 
+          scrollbarGutter: "stable",
+          color: colorMode === "dark" ? BASE_COLORS.lyricBaseDark : BASE_COLORS.lyricBaseLight,
+        }}
       >
         {groups.length === 0 ? (
           <p class="text-neutral-500">暂无歌词。</p>
@@ -99,16 +108,6 @@ export function LyricsPanel() {
                 {group.lines.map((line, lineIndex) => {
                   const isActiveLine = isActiveGroup && lineIndex === 0;
                   const hasWordTiming = line.segments.length > 1;
-                  const colorMode = getCurrentMode();
-
-                  const lyricTextColor =
-                    colorMode == "dark"
-                      ? BASE_COLORS.lyricBaseDark
-                      : BASE_COLORS.lyricBaseLight;
-                  const lyricBgColor =
-                    colorMode == "dark"
-                      ? BASE_COLORS.lyricsDarkTextColor
-                      : BASE_COLORS.lyricsLightTextColor;
 
                   // 非逐字歌词：激活 group 的所有行都高亮（主题色）
                   if (!hasWordTiming) {
@@ -118,7 +117,7 @@ export function LyricsPanel() {
                         class={isActiveGroup ? "" : "text-gray-500"}
                         style={{
                           whiteSpace: "pre-wrap",
-                          color: isActiveGroup ? "var(--theme-primary)" : undefined,
+                          color: isActiveGroup ? themeConfig.primary : undefined,
                         }}
                       >
                         {line.segments.map((seg, segIndex) => (
@@ -147,7 +146,7 @@ export function LyricsPanel() {
                       class="relative inline-block"
                       style={{
                         whiteSpace: "pre-wrap",
-                        color: isActiveGroup ? "white" : "text-gray-500",
+                        color: isActiveGroup ? "#ffffff" : "#6b7280",
                       }}
                     >
                       {/* 背景文字层（用于占位） */}
@@ -162,7 +161,7 @@ export function LyricsPanel() {
                         <span
                           class="absolute inset-0 pointer-events-none"
                           style={{
-                            background: `linear-gradient(90deg, var(--theme-primary) ${progressPercent}%, white ${progressPercent}%)`,
+                            background: `linear-gradient(90deg, ${themeConfig.primary} ${progressPercent}%, #ffffff ${progressPercent}%)`,
                             WebkitBackgroundClip: "text",
                             backgroundClip: "text",
                             color: "transparent",
